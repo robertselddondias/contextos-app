@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "476612297857",
+    "project_id": "contextual-a1573",
+    "storage_bucket": "contextual-a1573.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:476612297857:android:07f5d9dae303f038b77980",
+        "android_client_info": {
+          "package_name": "com.selddon.contextual"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDVUGSSV_WTFPdF41OMuywyW0FabYb6KnQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:476612297857:android:85d3eb54bd40b535b77980",
+        "android_client_info": {
+          "package_name": "com.selddon.contextual.contextual"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDVUGSSV_WTFPdF41OMuywyW0FabYb6KnQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

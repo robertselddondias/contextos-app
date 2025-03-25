@@ -1,0 +1,100 @@
+name: contextual
+description: Um jogo de adivinhação de palavras baseado em proximidade semântica.
+publish_to: 'none'
+version: 1.0.1+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+  flutter: ">=3.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # UI
+  cupertino_icons: ^1.0.6
+  google_fonts: ^6.1.0
+  animated_text_kit: ^4.2.2
+  lottie: ^2.7.0
+  flutter_svg: ^2.0.9
+
+  games_services: ^3.0.0
+
+  # Gerenciamento de Estado
+  flutter_bloc: ^8.1.3
+  equatable: ^2.0.5
+  get_it: ^7.6.4
+  dartz: ^0.10.1
+
+  # Armazenamento Local
+  shared_preferences: ^2.5.2
+  path_provider: ^2.1.5
+
+  # Redes e APIs
+  http: ^1.3.0
+  dio: ^5.8.0+1
+
+  # Google NLP API
+  googleapis: ^14.0.0
+  googleapis_auth: ^1.6.0
+
+  google_mobile_ads: ^5.3.1
+
+  smooth_page_indicator: ^1.1.0
+  confetti: ^0.7.0
+
+  # Internacionalização
+  intl: ^0.19.0
+  flutter_localizations:
+    sdk: flutter
+
+  # Compartilhamento
+  share_plus: ^7.2.1
+
+  # Utilitários
+  collection: ^1.18.0
+  uuid: ^4.2.1
+  logger: ^2.0.2+1
+  url_launcher: ^6.2.2
+
+  # Firebase
+  firebase_core: ^3.12.1
+  cloud_firestore: ^5.6.5
+  firebase_analytics: ^11.4.4
+  firebase_crashlytics: ^4.3.4
+  firebase_messaging: ^15.2.4
+  flutter_local_notifications: ^18.0.0
+
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
+  bloc_test: ^9.1.5
+  mockito: ^5.4.4
+  build_runner: ^2.4.7
+  json_serializable: ^6.7.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/credentials/
+    - assets/animations/
+    - assets/icons/
+    - assets/words/
+
+  fonts:
+    - family: Montserrat
+      fonts:
+        - asset: assets/fonts/Montserrat-Regular.ttf
+        - asset: assets/fonts/Montserrat-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Montserrat-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Montserrat-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Montserrat-Light.ttf
+          weight: 300
