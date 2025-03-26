@@ -168,7 +168,7 @@ class FirebaseGameRepository implements GameRepository {
   @override
   Future<Either<Failure, GameStateModel>> resetGame(String newTargetWord) async {
     try {
-      // Criamos o ID para o dia atual
+      // Criamos o ID para o dia atual - IMPORTANTE: sempre usar a data atual
       final today = DateTime.now();
       final dailyWordId = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
 
@@ -201,7 +201,7 @@ class FirebaseGameRepository implements GameRepository {
         guesses: [],
         isCompleted: false,
         bestScore: bestScore,
-        dailyWordId: dailyWordId,
+        dailyWordId: dailyWordId, // Sempre usa o ID do dia atual
         wasShared: false,
       );
 

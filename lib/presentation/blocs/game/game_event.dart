@@ -28,3 +28,8 @@ class GameReset extends GameEvent {
 class GameShared extends GameEvent {
   const GameShared();
 }
+
+// Adicionar este novo evento
+class GameRefreshDaily extends GameEvent {
+  const GameRefreshDaily();
+}

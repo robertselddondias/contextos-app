@@ -3,6 +3,7 @@
 
 import 'package:contextual/presentation/blocs/game/game_bloc.dart';
 import 'package:contextual/presentation/blocs/settings/settings_bloc.dart';
+import 'package:contextual/utils/app_version_helper.dart';
 import 'package:contextual/utils/responsive_utils.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -248,8 +249,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
               // Versão do app
               Center(
-                child: Text(
-                  'Versão 1.0.0',
+                child: AppVersionHelper.buildVersionText(
                   style: TextStyle(
                     fontSize: context.responsiveFontSize(12),
                     color: Theme.of(context).textTheme.bodySmall?.color,
@@ -475,19 +475,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
               large: 12.0,
             ),
           ),
-          onTap: () {
-            // Reiniciar o jogo, forçando buscar a palavra do dia novamente
-            context.read<GameBloc>().add(const GameReset());
-            // Mostrar confirmação
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Palavra do dia atualizada'),
-                duration: Duration(seconds: 2),
-              ),
-            );
-          },
+          onTap: () => _forceUpdateDailyWord(context),
         ),
       ],
     );
+  }
+
+  void _forceUpdateDailyWord(BuildContext context) {
+    // Obtém o GameBloc e aciona a atualização
+    final gameBloc = context.read<GameBloc>();
+
+    // Mostrar diálogo de carregamento
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+
+    // Aciona a atualização
+    gameBloc.checkDailyWordUpdate();
+
+    // Aguarda um pouco para o processo ser concluído
+    Future.delayed(const Duration(seconds: 1), () {
+      // Fecha o diálogo de carregamento se o contexto ainda estiver montado
+      if (context.mounted) {
+        Navigator.of(context).pop();
+
+        // Mostrar confirmação
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Palavra do dia atualizada'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    });
   }
 }

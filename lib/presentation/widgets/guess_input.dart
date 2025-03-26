@@ -242,7 +242,6 @@ class _GuessInputState extends State<GuessInput> with SingleTickerProviderStateM
               ),
             ),
           ),
-          const SizedBox(height: 16,)
         ],
       ),
     );

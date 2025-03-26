@@ -1,9 +1,11 @@
+// Modificação para app.dart
 import 'package:contextual/core/routes/app_routes.dart';
 import 'package:contextual/core/theme/app_theme.dart';
 import 'package:contextual/presentation/blocs/game/game_bloc.dart';
 import 'package:contextual/presentation/blocs/settings/settings_bloc.dart';
 import 'package:contextual/presentation/screens/onboarding_screen.dart';
 import 'package:contextual/presentation/screens/splash_screen.dart';
+import 'package:contextual/presentation/widgets/date_change_detector.dart';
 import 'package:contextual/utils/keyboard_dismisser.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -14,9 +16,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 class ContextoApp extends StatelessWidget {
   const ContextoApp({super.key});
 
+  // Função para verificar se deve mostrar o onboarding
   Future<bool> _shouldShowOnboarding() async {
-    final prefs = await SharedPreferences.getInstance();
-    return !(prefs.getBool('showedOnboarding') ?? false);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return !(prefs.getBool('showedOnboarding') ?? false);
+    } catch (e) {
+      // Em caso de erro, retornamos false para ir direto para o app
+      return false;
+    }
   }
 
   @override
@@ -35,41 +43,43 @@ class ContextoApp extends StatelessWidget {
         previous.themeMode != current.themeMode ||
             previous.locale != current.locale,
         builder: (context, state) {
-          // Envolva o MaterialApp com o AppKeyboardManager
+          // Envolva o MaterialApp com o DateChangeDetector
           return AppKeyboardManager(
-            child: MaterialApp(
-              title: 'Contexto',
-              debugShowCheckedModeBanner: false,
-              themeMode: state.themeMode,
-              theme: AppTheme.lightTheme,
-              darkTheme: AppTheme.darkTheme,
-              localizationsDelegates: const [
-                GlobalMaterialLocalizations.delegate,
-                GlobalWidgetsLocalizations.delegate,
-                GlobalCupertinoLocalizations.delegate,
-              ],
-              supportedLocales: const [
-                Locale('pt', 'BR'),
-                Locale('en', 'US'),
-                Locale('es', 'ES'),
-              ],
-              locale: state.locale,
-              routes: AppRoutes.routes,
-              home: FutureBuilder<bool>(
-                future: _shouldShowOnboarding(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const SplashScreen();
-                  }
+            child: DateChangeDetector(
+              child: MaterialApp(
+                title: 'Contexto',
+                debugShowCheckedModeBanner: false,
+                themeMode: state.themeMode,
+                theme: AppTheme.lightTheme,
+                darkTheme: AppTheme.darkTheme,
+                localizationsDelegates: const [
+                  GlobalMaterialLocalizations.delegate,
+                  GlobalWidgetsLocalizations.delegate,
+                  GlobalCupertinoLocalizations.delegate,
+                ],
+                supportedLocales: const [
+                  Locale('pt', 'BR'),
+                  Locale('en', 'US'),
+                  Locale('es', 'ES'),
+                ],
+                locale: state.locale,
+                routes: AppRoutes.routes,
+                home: FutureBuilder<bool>(
+                  future: _shouldShowOnboarding(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const SplashScreen();
+                    }
 
-                  final shouldShowOnboarding = snapshot.data ?? false;
+                    final shouldShowOnboarding = snapshot.data ?? false;
 
-                  if (shouldShowOnboarding) {
-                    return const OnboardingScreen();
-                  } else {
-                    return const SplashScreen();
-                  }
-                },
+                    if (shouldShowOnboarding) {
+                      return const OnboardingScreen();
+                    } else {
+                      return const SplashScreen();
+                    }
+                  },
+                ),
               ),
             ),
           );
