@@ -33,7 +33,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 controller: controller,
                 onPageChanged: (index) {
                   setState(() {
-                    isLastPage = index == 3;
+                    isLastPage = index == 4; // Updated to account for the new page
                   });
                 },
                 children: [
@@ -54,6 +54,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     description: 'Quanto maior a porcentagem, mais próximo você está. Tente encontrar palavras semanticamente similares.',
                     icon: Icons.tips_and_updates,
                     iconColor: Colors.amber,
+                  ),
+                  _buildPage(
+                    title: 'Similaridade Linguística',
+                    description: 'Se a palavra não estiver no contexto semântico, ela será analisada por similaridade linguística, considerando aspectos como coincidência de letras com a palavra secreta.',
+                    icon: Icons.spellcheck,
+                    iconColor: ColorConstants.info,
                   ),
                   _buildPage(
                     title: 'Está Pronto?',
@@ -104,7 +110,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         TextButton(
-          onPressed: () => controller.jumpToPage(3),
+          onPressed: () => controller.jumpToPage(4), // Updated to account for the new page
           child: Text(
             'PULAR',
             style: TextStyle(
@@ -117,7 +123,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         Center(
           child: SmoothPageIndicator(
             controller: controller,
-            count: 4,
+            count: 5, // Updated count to account for the new page
             effect: WormEffect(
               spacing: context.responsiveValue(
                 small: 12.0,

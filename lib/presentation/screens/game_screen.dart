@@ -9,6 +9,7 @@ import 'package:contextual/presentation/widgets/loading_indicator.dart';
 import 'package:contextual/presentation/widgets/rewarded_ad_button.dart';
 import 'package:contextual/presentation/widgets/success_dialog.dart';
 import 'package:contextual/services/ad_manager.dart';
+import 'package:contextual/services/game_services.dart';
 import 'package:contextual/utils/responsive_utils.dart';
 import 'package:contextual/utils/share_helper.dart';
 import 'package:flutter/material.dart';
@@ -24,16 +25,28 @@ class GameScreen extends StatefulWidget {
 class _GameScreenState extends State<GameScreen> {
   final TextEditingController _guessController = TextEditingController();
   final AdManager _adManager = AdManager();
+  final GameServicesManager _gameServicesManager = GameServicesManager();
   bool _hasShownSuccessDialog = false;
+  bool _isGameCenterAvailable = false;
 
   @override
   void initState() {
     super.initState();
     _initAds();
+    _initGameServices();
   }
 
   Future<void> _initAds() async {
     await _adManager.initialize();
+  }
+
+  Future<void> _initGameServices() async {
+    final isInitialized = await _gameServicesManager.initialize();
+    if (mounted) {
+      setState(() {
+        _isGameCenterAvailable = isInitialized && _gameServicesManager.isAvailable;
+      });
+    }
   }
 
   @override
@@ -79,7 +92,12 @@ class _GameScreenState extends State<GameScreen> {
             _showSuccessDialog(context, state);
             _hasShownSuccessDialog = true;
 
-            // Mostrar anúncio intersticial quando o jogo for completado
+            // Submit score to Game Center/Google Play Games when game is completed
+            if (_isGameCenterAvailable) {
+              _gameServicesManager.processGameWin(state.guesses.length);
+            }
+
+            // Show interstitial ad when game is completed
             _adManager.notifyGameCompleted();
           }
         },
@@ -95,24 +113,31 @@ class _GameScreenState extends State<GameScreen> {
           if (state is GameLoaded || (state is GameLoading && state.previousState is GameLoaded)) {
             final gameState = state is GameLoaded ? state : (state as GameLoading).previousState as GameLoaded;
 
-            // Use SafeArea para garantir que o conteúdo está dentro da área segura da tela
+            // Use SafeArea for ensuring content is within safe screen area
             return SafeArea(
               child: LayoutBuilder(
                   builder: (context, constraints) {
                     return Column(
                       children: [
-                        // Banner de anúncio no topo
+                        // Banner ad at the top (when game not completed)
                         if (!gameState.isCompleted)
                           const AdBannerWidget(isTop: true),
 
-                        // Cabeçalho com informações do jogo
+                        // Game header with game information
                         GameHeader(
                           bestScore: gameState.bestScore,
                           currentAttempts: gameState.guesses.length,
                           isCompleted: gameState.isCompleted,
                         ),
 
-                        // Lista de tentativas
+                        // Game Center Ranking Button (positioned below header when game is active)
+                        if (_isGameCenterAvailable && !gameState.isCompleted)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                            child: _buildGameCenterButton(),
+                          ),
+
+                        // Guess list (takes remaining space)
                         Expanded(
                           child: Padding(
                             padding: const EdgeInsets.only(bottom: 8.0),
@@ -123,16 +148,16 @@ class _GameScreenState extends State<GameScreen> {
                           ),
                         ),
 
-                        // Container para botões e input com scroll se necessário
+                        // Container for buttons and input with scroll if needed
                         ConstrainedBox(
                           constraints: BoxConstraints(
-                            maxHeight: constraints.maxHeight * 0.3, // Limite a altura
+                            maxHeight: constraints.maxHeight * 0.3, // Limit height
                           ),
                           child: SingleChildScrollView(
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                // Botão de anúncio recompensado quando o jogador está travado
+                                // Rewarded ad button when player is stuck
                                 if (!gameState.isCompleted && gameState.guesses.isNotEmpty && gameState.guesses.length >= 5)
                                   Padding(
                                     padding: EdgeInsets.symmetric(
@@ -148,7 +173,7 @@ class _GameScreenState extends State<GameScreen> {
                                       rewardText: 'Dica: uma palavra semelhante à palavra-alvo é "${_getHintWord(gameState)}"',
                                       icon: Icons.lightbulb_outline,
                                       onRewarded: () {
-                                        // Lógica para conceder uma dica ao usuário
+                                        // Logic to provide a hint to the user
                                         ScaffoldMessenger.of(context).showSnackBar(
                                           SnackBar(
                                             content: Text(
@@ -163,7 +188,7 @@ class _GameScreenState extends State<GameScreen> {
                                     ),
                                   ),
 
-                                // Campo de entrada para novas tentativas
+                                // Input field for new guesses
                                 if (!gameState.isCompleted)
                                   Padding(
                                     padding: const EdgeInsets.symmetric(vertical: 4.0),
@@ -180,7 +205,7 @@ class _GameScreenState extends State<GameScreen> {
                                     ),
                                   ),
 
-                                // Botões e anúncios quando o jogo é completado
+                                // Buttons and ads when game is completed
                                 if (gameState.isCompleted)
                                   Padding(
                                     padding: EdgeInsets.all(context.responsiveValue(
@@ -191,6 +216,13 @@ class _GameScreenState extends State<GameScreen> {
                                     child: Column(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
+                                        // Game Center Ranking Button (prominent placement when game is completed)
+                                        if (_isGameCenterAvailable)
+                                          Padding(
+                                            padding: const EdgeInsets.only(bottom: 12.0),
+                                            child: _buildGameCenterButton(isLarge: true),
+                                          ),
+
                                         ElevatedButton.icon(
                                           onPressed: () => _shareResults(context, gameState),
                                           icon: Icon(Icons.share, size: context.responsiveSize(18)),
@@ -211,16 +243,16 @@ class _GameScreenState extends State<GameScreen> {
                                           large: 16.0,
                                         )),
 
-                                        // Botão para anúncios recompensados
+                                        // Rewarded ad button
                                         RewardedAdButton(
                                           text: 'Palavra extra',
                                           rewardText: 'Você desbloqueou uma palavra extra para hoje!',
                                           icon: Icons.card_giftcard,
                                           onRewarded: () {
-                                            // Lógica para desbloquear palavra extra
+                                            // Logic to unlock extra word
                                             context.read<GameBloc>().add(const GameReset());
 
-                                            // Exibir mensagem de sucesso
+                                            // Show success message
                                             ScaffoldMessenger.of(context).showSnackBar(
                                               SnackBar(
                                                 content: Text(
@@ -234,7 +266,7 @@ class _GameScreenState extends State<GameScreen> {
                                           },
                                         ),
 
-                                        // Banner no fundo da tela quando o jogo for completado
+                                        // Banner ad at the bottom when game is completed
                                         SizedBox(height: context.responsiveValue(
                                           small: 8.0,
                                           medium: 12.0,
@@ -255,11 +287,41 @@ class _GameScreenState extends State<GameScreen> {
             );
           }
 
-          // Fallback para casos inesperados
+          // Fallback for unexpected cases
           return const Center(
             child: Text('Algo deu errado. Tente novamente.'),
           );
         },
+      ),
+    );
+  }
+
+  // Game Center/Google Play Games leaderboard button
+  Widget _buildGameCenterButton({bool isLarge = false}) {
+    return ElevatedButton.icon(
+      onPressed: () {
+        _gameServicesManager.showLeaderboard();
+      },
+      icon: Icon(
+        Icons.leaderboard,
+        size: isLarge ? 24.0 : 20.0,
+        color: Colors.white,
+      ),
+      label: Text(
+        'Ver Ranking Global',
+        style: TextStyle(
+          fontSize: context.responsiveFontSize(isLarge ? 15 : 13),
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
+      ),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: ColorConstants.info,
+        padding: EdgeInsets.symmetric(
+          vertical: isLarge ? 12.0 : 8.0,
+          horizontal: isLarge ? 20.0 : 16.0,
+        ),
+        minimumSize: isLarge ? Size(double.infinity, 50) : null,
       ),
     );
   }
@@ -317,7 +379,12 @@ class _GameScreenState extends State<GameScreen> {
               ),
               SizedBox(height: context.responsiveSize(8)),
               Text(
-                '4. Tente acertar com o menor número possível de tentativas!',
+                '4. Se a palavra não estiver no contexto semântico, ela será analisada por similaridade linguística, considerando aspectos como coincidência de letras com a palavra secreta.',
+                style: TextStyle(fontSize: context.responsiveFontSize(14), fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: context.responsiveSize(8)),
+              Text(
+                '5. Tente acertar com o menor número possível de tentativas!',
                 style: TextStyle(fontSize: context.responsiveFontSize(14)),
               ),
               SizedBox(height: context.responsiveSize(16)),
@@ -389,9 +456,9 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
-  // Método auxiliar para obter uma dica para o anúncio recompensado
+  // Helper method to get a hint word for rewarded ad
   String _getHintWord(GameLoaded state) {
-    // Ordena as tentativas por similaridade (da maior para a menor)
+    // Sort guesses by similarity (highest to lowest)
     if (state.guesses.isEmpty) {
       return "categoria";
     }
@@ -399,18 +466,18 @@ class _GameScreenState extends State<GameScreen> {
     final sortedGuesses = List<Guess>.from(state.guesses)
       ..sort((a, b) => b.similarity.compareTo(a.similarity));
 
-    // Retorna a palavra mais próxima como dica
+    // Return the closest word as a hint
     if (sortedGuesses.isNotEmpty && sortedGuesses.first.similarity > 0.5) {
       return sortedGuesses.first.word;
     }
 
-    // Lista de palavras relacionadas genéricas caso não tenha uma boa dica
+    // List of generic related words if there's no good hint
     final genericHints = [
       'objeto', 'conceito', 'animal', 'lugar', 'ação',
       'sentimento', 'natureza', 'tecnologia', 'pessoa',
     ];
 
-    // Retorna uma dica genérica
+    // Return a generic hint
     return genericHints[DateTime.now().microsecond % genericHints.length];
   }
 }

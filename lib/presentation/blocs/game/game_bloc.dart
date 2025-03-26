@@ -1,5 +1,6 @@
 // presentation/blocs/game/game_bloc.dart
 import 'dart:async';
+import 'dart:io';
 
 import 'package:bloc/bloc.dart';
 import 'package:contextual/domain/entities/guess.dart';
@@ -160,10 +161,10 @@ class GameBloc extends Bloc<GameEvent, GameState> {
     final today = DateTime.now();
     final dayNumber = today.difference(DateTime(2023, 1, 1)).inDays;
 
-    String shareText = 'Contexto #$dayNumber\n';
+    String shareText = 'Contextual #$dayNumber\n';
 
     if (currentState.isCompleted) {
-      shareText += 'Encontrei a palavra "${currentState.targetWord.toUpperCase()}" em ${currentState.guesses.length} tentativas!\n\n';
+      shareText += 'Encontrei a palavra em ${currentState.guesses.length} tentativas!\n\n';
     } else {
       shareText += 'Ainda estou tentando...\n\n';
     }
@@ -175,7 +176,9 @@ class GameBloc extends Bloc<GameEvent, GameState> {
       shareText += '${i + 1}. ${guess.word} (${(guess.similarity * 100).toStringAsFixed(0)}%)\n';
     }
 
-    shareText += '\nJogue em: contexto-game.exemplo.com';
+    if(Platform.isIOS) {
+      shareText += '\nJogue em: https://apps.apple.com/br/app/contextual/id6743683117';
+    }
 
     return shareText;
   }
