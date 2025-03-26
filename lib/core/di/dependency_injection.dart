@@ -13,6 +13,9 @@ import 'package:contextual/domain/usecases/make_guess.dart';
 import 'package:contextual/domain/usecases/save_game_state.dart';
 import 'package:contextual/presentation/blocs/game/game_bloc.dart';
 import 'package:contextual/presentation/blocs/settings/settings_bloc.dart';
+import 'package:contextual/services/purchase_manager.dart';
+import 'package:contextual/services/smart_notification_service.dart';
+import 'package:contextual/services/user_activity_tracker.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get_it/get_it.dart';
@@ -94,26 +97,14 @@ Future<void> initDependencies() async {
     localDataSource: getIt<SharedPrefsManager>(),
   ));
 
-  // Inicializar serviços que precisam de inicialização
-  // try {
-  //   await getIt<FirebaseContextService>().initialize();
-  //
-  //   // Opcional: Popular com dados iniciais em ambiente de desenvolvimento
-  //   if (kDebugMode) {
-  //     // Verifica se já existem palavras
-  //     final hasWords = await getIt<FirebaseContextService>().wordExists('gato');
-  //     if (!hasWords) {
-  //       // Se não existem palavras, popula com dados iniciais
-  //       await WordRelationSeeder().seedBasicWords();
-  //       if (kDebugMode) {
-  //         print('Dados iniciais de palavras populados com sucesso!');
-  //       }
-  //     }
-  //   }
-  // } catch (e) {
-  //   if (kDebugMode) {
-  //     print('Erro ao inicializar serviços Firebase: $e');
-  //     print('O aplicativo continuará, mas as funcionalidades de contexto podem não funcionar corretamente.');
-  //   }
-  // }
+  final purchaseManager = PurchaseManager();
+  await purchaseManager.initialize();
+  getIt.registerSingleton<PurchaseManager>(purchaseManager);
+
+  final userActivityTracker = UserActivityTracker();
+  final smartNotificationService = SmartNotificationService();
+  await smartNotificationService.initialize();
+
+  getIt.registerSingleton<UserActivityTracker>(userActivityTracker);
+  getIt.registerSingleton<SmartNotificationService>(smartNotificationService);
 }

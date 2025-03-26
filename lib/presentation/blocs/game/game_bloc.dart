@@ -9,6 +9,7 @@ import 'package:contextual/domain/entities/guess.dart';
 import 'package:contextual/domain/usecases/get_daily_word.dart';
 import 'package:contextual/domain/usecases/make_guess.dart';
 import 'package:contextual/domain/usecases/save_game_state.dart';
+import 'package:contextual/services/premium_banner_service.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -231,6 +232,7 @@ class GameBloc extends Bloc<GameEvent, GameState> {
           bestScore: newGameState.bestScore,
           dailyWordId: newGameState.dailyWordId,
         ));
+        PremiumBannerService().trackGameSession();
       } else {
         emit(const GameError(message: 'Não foi possível inicializar o jogo'));
       }
@@ -300,7 +302,10 @@ class GameBloc extends Bloc<GameEvent, GameState> {
           emit(currentState);
         },
             (gameState) {
-          // Salva o novo estado nas preferências
+          if (gameState.isCompleted && !currentState.isCompleted) {
+            // Notifica o serviço de banner que o jogo foi completado
+            PremiumBannerService().trackGameSession(gameCompleted: true);
+          }
           _saveGameStateToPrefs(gameState);
 
           emit(GameLoaded(
@@ -312,6 +317,8 @@ class GameBloc extends Bloc<GameEvent, GameState> {
           ));
         },
       );
+
+
     } catch (e) {
       emit(GameError(
         message: e.toString(),
