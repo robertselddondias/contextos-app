@@ -87,39 +87,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  void _forceUpdateDailyWord(BuildContext context) {
-    // Obtém o GameBloc e aciona a atualização
-    final gameBloc = context.read<GameBloc>();
-
-    // Mostrar diálogo de carregamento
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(),
-      ),
-    );
-
-    // Aciona a atualização
-    gameBloc.checkDailyWordUpdate();
-
-    // Aguarda um pouco para o processo ser concluído
-    Future.delayed(const Duration(seconds: 1), () {
-      // Fecha o diálogo de carregamento se o contexto ainda estiver montado
-      if (context.mounted) {
-        Navigator.of(context).pop();
-
-        // Mostrar confirmação
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Palavra do dia atualizada'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -613,34 +580,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           onTap: () => Navigator.of(context).pushNamed('/word_relation_diagnostics'),
         ),
         const Divider(height: 1),
-        // Opção para forçar atualização da palavra do dia
-        ListTile(
-          title: Text(
-            'Forçar atualização da palavra',
-            style: TextStyle(fontSize: context.responsiveFontSize(14)),
-          ),
-          subtitle: Text(
-            'Buscar a palavra mais recente do servidor',
-            style: TextStyle(fontSize: context.responsiveFontSize(12)),
-          ),
-          trailing: Icon(
-            Icons.refresh,
-            size: context.responsiveSize(22),
-          ),
-          contentPadding: EdgeInsets.symmetric(
-            horizontal: context.responsiveValue(
-              small: 12.0,
-              medium: 16.0,
-              large: 20.0,
-            ),
-            vertical: context.responsiveValue(
-              small: 4.0,
-              medium: 8.0,
-              large: 12.0,
-            ),
-          ),
-          onTap: () => _forceUpdateDailyWord(context),
-        ),
         // Opção para testar notificações inteligentes
         const Divider(height: 1),
         ListTile(

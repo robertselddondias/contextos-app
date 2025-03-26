@@ -22,14 +22,18 @@ class GuessSubmitted extends GameEvent {
 }
 
 class GameReset extends GameEvent {
-  const GameReset();
+  final bool preserveGuesses;
+
+  const GameReset({this.preserveGuesses = false});
+
+  @override
+  List<Object> get props => [preserveGuesses];
 }
 
 class GameShared extends GameEvent {
   const GameShared();
 }
 
-// Adicionar este novo evento
 class GameRefreshDaily extends GameEvent {
   const GameRefreshDaily();
 }

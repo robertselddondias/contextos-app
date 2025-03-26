@@ -5,7 +5,6 @@ import 'package:contextual/presentation/blocs/game/game_bloc.dart';
 import 'package:contextual/presentation/blocs/settings/settings_bloc.dart';
 import 'package:contextual/presentation/screens/onboarding_screen.dart';
 import 'package:contextual/presentation/screens/splash_screen.dart';
-import 'package:contextual/presentation/widgets/date_change_detector.dart';
 import 'package:contextual/utils/keyboard_dismisser.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -45,41 +44,39 @@ class ContextoApp extends StatelessWidget {
         builder: (context, state) {
           // Envolva o MaterialApp com o DateChangeDetector
           return AppKeyboardManager(
-            child: DateChangeDetector(
-              child: MaterialApp(
-                title: 'Contexto',
-                debugShowCheckedModeBanner: false,
-                themeMode: state.themeMode,
-                theme: AppTheme.lightTheme,
-                darkTheme: AppTheme.darkTheme,
-                localizationsDelegates: const [
-                  GlobalMaterialLocalizations.delegate,
-                  GlobalWidgetsLocalizations.delegate,
-                  GlobalCupertinoLocalizations.delegate,
-                ],
-                supportedLocales: const [
-                  Locale('pt', 'BR'),
-                  Locale('en', 'US'),
-                  Locale('es', 'ES'),
-                ],
-                locale: state.locale,
-                routes: AppRoutes.routes,
-                home: FutureBuilder<bool>(
-                  future: _shouldShowOnboarding(),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const SplashScreen();
-                    }
+            child: MaterialApp(
+              title: 'Contexto',
+              debugShowCheckedModeBanner: false,
+              themeMode: state.themeMode,
+              theme: AppTheme.lightTheme,
+              darkTheme: AppTheme.darkTheme,
+              localizationsDelegates: const [
+                GlobalMaterialLocalizations.delegate,
+                GlobalWidgetsLocalizations.delegate,
+                GlobalCupertinoLocalizations.delegate,
+              ],
+              supportedLocales: const [
+                Locale('pt', 'BR'),
+                Locale('en', 'US'),
+                Locale('es', 'ES'),
+              ],
+              locale: state.locale,
+              routes: AppRoutes.routes,
+              home: FutureBuilder<bool>(
+                future: _shouldShowOnboarding(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const SplashScreen();
+                  }
 
-                    final shouldShowOnboarding = snapshot.data ?? false;
+                  final shouldShowOnboarding = snapshot.data ?? false;
 
-                    if (shouldShowOnboarding) {
-                      return const OnboardingScreen();
-                    } else {
-                      return const SplashScreen();
-                    }
-                  },
-                ),
+                  if (shouldShowOnboarding) {
+                    return const OnboardingScreen();
+                  } else {
+                    return const SplashScreen();
+                  }
+                },
               ),
             ),
           );

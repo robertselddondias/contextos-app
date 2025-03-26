@@ -1,4 +1,5 @@
 // core/di/dependency_injection.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:contextual/core/init/initialize_firestore.dart';
 import 'package:contextual/data/datasources/local/shared_prefs_manager.dart';
 import 'package:contextual/data/datasources/remote/firebase_context_service.dart';
@@ -87,14 +88,19 @@ Future<void> initDependencies() async {
     gameRepository: getIt<GameRepository>(),
   ));
 
-  // BLoCs
+  // Antes da linha de registro dos BLoCs
+  getIt.registerLazySingleton(() => SettingsBloc(
+    localDataSource: getIt<SharedPrefsManager>(),
+  ));
+
   getIt.registerFactory(() => GameBloc(
     getDailyWord: getIt<GetDailyWord>(),
     makeGuess: getIt<MakeGuess>(),
     saveGameState: getIt<SaveGameState>(),
-  ));
-  getIt.registerFactory(() => SettingsBloc(
-    localDataSource: getIt<SharedPrefsManager>(),
+    wordRepository: getIt<WordRepository>(),
+    gameRepository: getIt<GameRepository>(),
+    prefs: getIt<SharedPreferences>(),
+    firestore: FirebaseFirestore.instance,
   ));
 
   final purchaseManager = PurchaseManager();
