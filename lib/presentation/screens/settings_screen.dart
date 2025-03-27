@@ -1,8 +1,9 @@
-// Arquivo: lib/presentation/screens/settings_screen.dart
-// Reordenado: Histórico, Notificações, Tema, Ferramentas (debug)
-
+// lib/presentation/screens/settings_screen.dart
+import 'package:contextual/core/constants/color_constants.dart';
 import 'package:contextual/presentation/blocs/game/game_bloc.dart';
 import 'package:contextual/presentation/blocs/settings/settings_bloc.dart';
+import 'package:contextual/presentation/widgets/purchase_button.dart';
+import 'package:contextual/services/smart_notification_service.dart';
 import 'package:contextual/utils/app_version_helper.dart';
 import 'package:contextual/utils/responsive_utils.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -21,6 +22,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _isLoading = false;
   bool _notificationsEnabled = true;
+  bool _isSmartLoading = false;
 
   @override
   void initState() {
@@ -108,143 +110,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
             )),
             children: [
               // 1. Histórico
-              _buildSection(
-                context,
-                'Histórico',
-                [
-                  // ListTile com estilo consistente com o bloco de tema
-                  InkWell(
-                    onTap: () => Navigator.of(context).pushNamed('/history'),
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: context.responsiveValue(
-                          small: 12.0,
-                          medium: 16.0,
-                          large: 20.0,
-                        ),
-                        vertical: context.responsiveValue(
-                          small: 12.0,
-                          medium: 16.0,
-                          large: 18.0,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          // Ícone circular estilizado
-                          Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Theme.of(context).colorScheme.surfaceVariant,
-                            ),
-                            child: Icon(
-                              Icons.history_outlined,
-                              color: Theme.of(context).iconTheme.color,
-                              size: 24,
-                            ),
-                          ),
-                          SizedBox(width: 16),
-                          // Texto e descrição
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Ver histórico de jogos',
-                                  style: TextStyle(
-                                    fontSize: context.responsiveFontSize(15),
-                                    fontWeight: FontWeight.normal,
-                                  ),
-                                ),
-                                SizedBox(height: 4),
-                                Text(
-                                  'Veja suas tentativas anteriores',
-                                  style: TextStyle(
-                                    fontSize: context.responsiveFontSize(12),
-                                    color: Theme.of(context).textTheme.bodySmall?.color,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          // Ícone de seta para indicar navegação
-                          Icon(
-                            Icons.chevron_right,
-                            color: Theme.of(context).iconTheme.color?.withOpacity(0.6),
-                            size: 24,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-
+              _buildHistorySection(context),
               SizedBox(height: context.responsiveSize(16)),
 
-              // 2. Configuração de notificações
-              _buildSection(
-                context,
-                'Notificações',
-                [
-                  SwitchListTile(
-                    title: Text(
-                      'Palavra diária',
-                      style: TextStyle(fontSize: context.responsiveFontSize(14)),
-                    ),
-                    subtitle: Text(
-                      'Receba uma notificação quando uma nova palavra do dia estiver disponível',
-                      style: TextStyle(fontSize: context.responsiveFontSize(12)),
-                    ),
-                    value: _notificationsEnabled,
-                    onChanged: _isLoading ? null : _toggleNotifications,
-                    secondary: _isLoading
-                        ? SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
-                    )
-                        : Icon(
-                      _notificationsEnabled
-                          ? Icons.notifications_active
-                          : Icons.notifications_off,
-                      color: _notificationsEnabled
-                          ? Theme.of(context).colorScheme.primary
-                          : Colors.grey,
-                    ),
-                  ),
-                ],
-              ),
-
+              // 2. Notificações
+              _buildNotificationsSection(context),
               SizedBox(height: context.responsiveSize(16)),
 
-              // 3. Configuração do tema
-              _buildSection(
-                context,
-                'Tema',
-                [
-                  _buildThemeSelector(context, state),
-                ],
-              ),
-
+              // 3. Premium
+              _buildPremiumSection(context),
               SizedBox(height: context.responsiveSize(16)),
 
-              // 4. Ferramentas de desenvolvimento (apenas em debug)
+              // 4. Tema
+              _buildThemeSection(context, state),
+              SizedBox(height: context.responsiveSize(16)),
+
+              // 5. Ferramentas de desenvolvimento (apenas em debug)
               if (kDebugMode)
-                _buildSection(
-                  context,
-                  'Ferramentas de Desenvolvimento',
-                  [
-                    _buildDeveloperTools(context),
-                  ],
-                ),
-
+                _buildDeveloperSection(context),
               SizedBox(height: context.responsiveSize(16)),
 
               // Versão do app
@@ -256,6 +139,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ),
               ),
+              SizedBox(height: context.responsiveSize(8)),
             ],
           );
         },
@@ -293,7 +177,242 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  // Método para criar o seletor de tema, visualmente aprimorado
+  // Seção de histórico
+  Widget _buildHistorySection(BuildContext context) {
+    return _buildSection(
+      context,
+      'Histórico',
+      [
+        // ListTile com estilo consistente com o bloco de tema
+        InkWell(
+          onTap: () => Navigator.of(context).pushNamed('/history'),
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: context.responsiveValue(
+                small: 12.0,
+                medium: 16.0,
+                large: 20.0,
+              ),
+              vertical: context.responsiveValue(
+                small: 12.0,
+                medium: 16.0,
+                large: 18.0,
+              ),
+            ),
+            child: Row(
+              children: [
+                // Ícone circular estilizado
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Theme.of(context).colorScheme.surfaceVariant,
+                  ),
+                  child: Icon(
+                    Icons.history_outlined,
+                    color: Theme.of(context).iconTheme.color,
+                    size: 24,
+                  ),
+                ),
+                SizedBox(width: 16),
+                // Texto e descrição
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Ver histórico de jogos',
+                        style: TextStyle(
+                          fontSize: context.responsiveFontSize(15),
+                          fontWeight: FontWeight.normal,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Veja suas tentativas anteriores',
+                        style: TextStyle(
+                          fontSize: context.responsiveFontSize(12),
+                          color: Theme.of(context).textTheme.bodySmall?.color,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Ícone de seta para indicar navegação
+                Icon(
+                  Icons.chevron_right,
+                  color: Theme.of(context).iconTheme.color?.withOpacity(0.6),
+                  size: 24,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Seção de notificações
+  Widget _buildNotificationsSection(BuildContext context) {
+    return _buildSection(
+      context,
+      'Notificações',
+      [
+        _buildStandardNotificationToggle(context),
+        const Divider(height: 1),
+        _buildSmartNotificationToggle(context),
+      ],
+    );
+  }
+
+  // Toggle para notificações padrão
+  Widget _buildStandardNotificationToggle(BuildContext context) {
+    return StatefulBuilder(
+        builder: (context, setState) {
+          return SwitchListTile(
+            title: Text(
+              'Palavra diária',
+              style: TextStyle(fontSize: context.responsiveFontSize(14)),
+            ),
+            subtitle: Text(
+              'Receba uma notificação quando uma nova palavra do dia estiver disponível',
+              style: TextStyle(fontSize: context.responsiveFontSize(12)),
+            ),
+            value: _notificationsEnabled,
+            onChanged: _isLoading ? null : (value) async {
+              setState(() => _isLoading = true);
+              await _toggleNotifications(value);
+              setState(() => _isLoading = false);
+            },
+            secondary: _isLoading
+                ? SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  Theme.of(context).colorScheme.primary,
+                ),
+              ),
+            )
+                : Icon(
+              _notificationsEnabled
+                  ? Icons.notifications_active
+                  : Icons.notifications_off,
+              color: _notificationsEnabled
+                  ? Theme.of(context).colorScheme.primary
+                  : Colors.grey,
+            ),
+          );
+        }
+    );
+  }
+
+  // Toggle para notificações inteligentes
+  Widget _buildSmartNotificationToggle(BuildContext context) {
+    return StatefulBuilder(
+        builder: (context, setState) {
+          return FutureBuilder<bool>(
+              future: SmartNotificationService().isEnabled(),
+              initialData: false,
+              builder: (context, snapshot) {
+                final bool smartNotificationsEnabled = snapshot.data ?? false;
+
+                return SwitchListTile(
+                  title: Text(
+                    'Notificações inteligentes',
+                    style: TextStyle(fontSize: context.responsiveFontSize(14)),
+                  ),
+                  subtitle: Text(
+                    'Receba lembretes adaptados aos seus horários habituais de jogo',
+                    style: TextStyle(fontSize: context.responsiveFontSize(12)),
+                  ),
+                  value: smartNotificationsEnabled,
+                  onChanged: !_notificationsEnabled || _isSmartLoading ? null : (value) async {
+                    setState(() => _isSmartLoading = true);
+
+                    try {
+                      if (value) {
+                        // Ao ativar, solicitamos permissões
+                        final permissionsGranted = await SmartNotificationService().requestPermissions();
+
+                        if (!permissionsGranted && mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('É necessário permitir notificações nas configurações do dispositivo'),
+                              duration: Duration(seconds: 3),
+                            ),
+                          );
+                        }
+                      } else {
+                        // Ao desativar, simplesmente desligamos
+                        await SmartNotificationService().setEnabled(false);
+                      }
+
+                      // Força atualização da UI
+                      setState(() {});
+                    } catch (e) {
+                      if (kDebugMode) {
+                        print('Erro ao alterar notificações inteligentes: $e');
+                      }
+                    } finally {
+                      if (mounted) {
+                        setState(() => _isSmartLoading = false);
+                      }
+                    }
+                  },
+                  secondary: _isSmartLoading
+                      ? SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                  )
+                      : Icon(
+                    smartNotificationsEnabled
+                        ? Icons.auto_awesome
+                        : Icons.settings_suggest_outlined,
+                    color: (!_notificationsEnabled)
+                        ? Colors.grey
+                        : (smartNotificationsEnabled
+                        ? ColorConstants.secondary
+                        : Colors.grey),
+                  ),
+                );
+              }
+          );
+        }
+    );
+  }
+
+  // Seção Premium
+  Widget _buildPremiumSection(BuildContext context) {
+    return _buildSection(
+      context,
+      'Premium',
+      [
+        const PurchaseButton(),
+      ],
+    );
+  }
+
+  // Seção de configuração de tema
+  Widget _buildThemeSection(BuildContext context, SettingsState state) {
+    return _buildSection(
+      context,
+      'Tema',
+      [
+        _buildThemeSelector(context, state),
+      ],
+    );
+  }
+
+  // Seletor de tema
   Widget _buildThemeSelector(BuildContext context, SettingsState state) {
     return Column(
       children: [
@@ -327,7 +446,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-// Novo método para criar cada opção de tema com design aprimorado
+// Opção de tema
   Widget _buildThemeOption(
       BuildContext context,
       String title,
@@ -418,6 +537,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  // Seção de ferramentas para desenvolvedores
+  Widget _buildDeveloperSection(BuildContext context) {
+    return _buildSection(
+      context,
+      'Ferramentas de Desenvolvimento',
+      [
+        _buildDeveloperTools(context),
+      ],
+    );
+  }
+
+  // Ferramentas de desenvolvimento
   Widget _buildDeveloperTools(BuildContext context) {
     return Column(
       children: [
@@ -449,18 +580,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
           onTap: () => Navigator.of(context).pushNamed('/word_relation_diagnostics'),
         ),
         const Divider(height: 1),
-        // Opção para forçar atualização da palavra do dia
+        // Opção para testar notificações inteligentes
+        const Divider(height: 1),
         ListTile(
           title: Text(
-            'Forçar atualização da palavra',
+            'Testar notificação inteligente',
             style: TextStyle(fontSize: context.responsiveFontSize(14)),
           ),
           subtitle: Text(
-            'Buscar a palavra mais recente do servidor',
+            'Enviar uma notificação teste',
             style: TextStyle(fontSize: context.responsiveFontSize(12)),
           ),
           trailing: Icon(
-            Icons.refresh,
+            Icons.notifications,
             size: context.responsiveSize(22),
           ),
           contentPadding: EdgeInsets.symmetric(
@@ -475,42 +607,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
               large: 12.0,
             ),
           ),
-          onTap: () => _forceUpdateDailyWord(context),
+          onTap: () => _sendTestNotification(context),
         ),
       ],
     );
   }
 
-  void _forceUpdateDailyWord(BuildContext context) {
-    // Obtém o GameBloc e aciona a atualização
-    final gameBloc = context.read<GameBloc>();
-
-    // Mostrar diálogo de carregamento
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(),
-      ),
-    );
-
-    // Aciona a atualização
-    gameBloc.checkDailyWordUpdate();
-
-    // Aguarda um pouco para o processo ser concluído
-    Future.delayed(const Duration(seconds: 1), () {
-      // Fecha o diálogo de carregamento se o contexto ainda estiver montado
-      if (context.mounted) {
-        Navigator.of(context).pop();
-
-        // Mostrar confirmação
+  // Enviar notificação de teste
+  Future<void> _sendTestNotification(BuildContext context) async {
+    try {
+      await SmartNotificationService().sendTestNotification();
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Palavra do dia atualizada'),
+            content: Text('Notificação de teste enviada'),
             duration: Duration(seconds: 2),
           ),
         );
       }
-    });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao enviar notificação: $e'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    }
   }
 }

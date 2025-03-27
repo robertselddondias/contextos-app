@@ -168,47 +168,54 @@ class FirebaseGameRepository implements GameRepository {
   @override
   Future<Either<Failure, GameStateModel>> resetGame(String newTargetWord) async {
     try {
-      // Criamos o ID para o dia atual - IMPORTANTE: sempre usar a data atual
+      // Criamos o ID para o dia atual
       final today = DateTime.now();
       final dailyWordId = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+
+      // Obtém o estado atual salvo
+      final savedGameStateJson = _prefs.getString(AppConstants.prefsKeyGameState);
+      GameStateModel? savedGameState;
+
+      if (savedGameStateJson != null) {
+        savedGameState = GameStateModel.fromRawJson(savedGameStateJson);
+      }
 
       // Obtemos a melhor pontuação
       final bestScore = _prefs.getInt(AppConstants.prefsKeyBestScore) ?? 0;
 
-      // ALTERAÇÃO AQUI: Tentamos buscar a palavra do dia do Firestore
-      // em vez de usar a palavra passada como parâmetro
-      String targetWord = newTargetWord; // Valor padrão
+      // Tenta obter a palavra do dia do Firestore
+      String targetWord = newTargetWord;
 
       try {
         final dailyWordDoc = await _firestore.collection('daily_words').doc(dailyWordId).get();
 
         if (dailyWordDoc.exists && dailyWordDoc.data()!.containsKey('word')) {
-          // Usa a palavra definida pelo Firebase Functions
           targetWord = dailyWordDoc.data()!['word'];
-          print('Palavra do dia obtida do Firestore: $targetWord');
-        } else {
-          // Se não encontrou no Firestore, mantém a palavra padrão
-          print('Palavra do dia não encontrada no Firestore, usando palavra padrão');
+          print('Nova palavra do dia obtida do Firestore: $targetWord');
         }
       } catch (e) {
-        print('Erro ao buscar palavra do dia do Firestore: $e');
-        // Continua usando a palavra padrão em caso de erro
+        print('Erro ao buscar nova palavra do dia: $e');
       }
 
-      // Criamos um novo estado de jogo
-      final newGameState = GameStateModel(
-        targetWord: targetWord,
-        guesses: [],
-        isCompleted: false,
-        bestScore: bestScore,
-        dailyWordId: dailyWordId, // Sempre usa o ID do dia atual
-        wasShared: false,
-      );
+      // Só cria um novo estado se a palavra for diferente
+      if (savedGameState == null || targetWord != savedGameState.targetWord) {
+        final newGameState = GameStateModel(
+          targetWord: targetWord,
+          guesses: [], // Reseta as tentativas somente se palavra mudar
+          isCompleted: false,
+          bestScore: bestScore,
+          dailyWordId: dailyWordId,
+          wasShared: false,
+        );
 
-      // Salvamos o novo estado
-      await _prefs.setString(AppConstants.prefsKeyGameState, newGameState.toRawJson());
+        // Salva o novo estado
+        await _prefs.setString(AppConstants.prefsKeyGameState, newGameState.toRawJson());
 
-      return Right(newGameState);
+        return Right(newGameState);
+      } else {
+        // Mantém o estado atual se a palavra for a mesma
+        return Right(savedGameState);
+      }
     } catch (e) {
       return Left(UnexpectedFailure(e.toString()));
     }

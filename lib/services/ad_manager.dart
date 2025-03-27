@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:contextual/services/purchase_manager.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -58,6 +59,8 @@ class AdManager {
   static const String _iosRewardedAdUnitId = 'ca-app-pub-4458700759850229/2533985374';
   static const String _androidRewardedAdUnitId = 'ca-app-pub-4458700759850229/4442096867';
 
+  final PurchaseManager _purchaseManager = PurchaseManager();
+
   // Getters for ad unit IDs based on platform and test mode
   String get bannerAdUnitId {
     if (_useTestAds) return _testBannerAdUnitId;
@@ -74,9 +77,6 @@ class AdManager {
     return Platform.isIOS ? _iosRewardedAdUnitId : _androidRewardedAdUnitId;
   }
 
-  /// Initialize the ad service.
-  ///
-  /// Should be called early in the app lifecycle, typically in main.dart.
   Future<void> initialize() async {
     if (_isInitialized) {
       debugPrint('AdService: Already initialized');
@@ -84,13 +84,27 @@ class AdManager {
     }
 
     try {
+      // Inicializa o gerenciador de compras
+      await _purchaseManager.initialize();
+
+      // Se o usuário comprou remover anúncios, não inicializamos os anúncios
+      _isPremium = _purchaseManager.removeAdsActive;
+
+      // Inscreve-se nas mudanças do estado de compra para atualizar o estado premium
+      _purchaseManager.purchaseStateStream.listen((isPremiumActive) {
+        _isPremium = isPremiumActive;
+        debugPrint('AdService: Premium status updated to $_isPremium');
+      });
+
+      // Se o usuário é premium, apenas marcamos como inicializado e saímos
+      if (_isPremium) {
+        _isInitialized = true;
+        debugPrint('AdService: Initialized in premium mode (ads disabled)');
+        return;
+      }
+
       // Initialize the Mobile Ads SDK
       await MobileAds.instance.initialize();
-
-      // Set up app open ads (optional)
-      // MobileAds.instance.updateRequestConfiguration(
-      //   RequestConfiguration(testDeviceIds: ['YOUR_TEST_DEVICE_ID']),
-      // );
 
       // Load user premium status
       await _loadPremiumStatus();
