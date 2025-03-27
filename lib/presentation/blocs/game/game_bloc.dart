@@ -319,28 +319,130 @@ class GameBloc extends Bloc<GameEvent, GameState> {
       GameRefreshDaily event,
       Emitter<GameState> emit,
       ) async {
-    if (state is! GameLoaded) return;
+    try {
+      // Obter a data atual no formato YYYY-MM-DD
+      final today = DateTime.now();
+      final currentDateStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
 
-    final currentState = state as GameLoaded;
+      // Obtemos o estado atual do jogo
+      final currentStateResult = await _loadSavedGameState();
+      final currentState = (state is GameLoaded) ? state as GameLoaded :
+      (currentStateResult != null ? GameLoaded(
+        targetWord: currentStateResult.targetWord,
+        guesses: currentStateResult.guesses,
+        isCompleted: currentStateResult.isCompleted,
+        bestScore: currentStateResult.bestScore,
+        dailyWordId: currentStateResult.dailyWordId,
+      ) : null);
 
-    // Obtém a data atual
-    final today = DateTime.now();
-    final currentDateStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+      // Mostrar estado de carregamento se já temos um estado atual
+      if (currentState != null) {
+        emit(GameLoading(previousState: currentState));
+      } else {
+        emit(const GameLoading());
+      }
 
-    // Verifica se o jogo atual é de uma data diferente
-    if (currentState.dailyWordId != currentDateStr) {
-      add(const GameReset());
+      // PASSO 1: Verificar se já temos um estado de jogo válido para hoje
+      bool needsRefresh = true;
+
+      if (currentState != null) {
+        // Verificar se o ID do jogo corresponde à data atual
+        if (currentState.dailyWordId == currentDateStr) {
+          // Temos um jogo para hoje, mas precisamos verificar se a palavra está correta
+
+          // PASSO 2: Verificar se a palavra em cache corresponde à do Firestore
+          try {
+            // Buscar a palavra do dia no Firestore
+            final docSnapshot = await _firestore.collection('daily_words').doc(currentDateStr).get();
+
+            if (docSnapshot.exists && docSnapshot.data()!.containsKey('word')) {
+              final serverWord = docSnapshot.data()!['word'] as String;
+
+              // Comparar com a palavra atual
+              if (serverWord.toLowerCase() == currentState.targetWord.toLowerCase()) {
+                // A palavra é a mesma, não precisamos atualizar
+                needsRefresh = false;
+
+                if (kDebugMode) {
+                  print('Palavra em cache corresponde à palavra do servidor para hoje: ${currentState.targetWord}');
+                }
+
+                // Apenas emitir o estado atual novamente
+                emit(currentState);
+              } else {
+                // A palavra é diferente, precisamos atualizar
+                if (kDebugMode) {
+                  print('Palavra em cache (${currentState.targetWord}) é diferente da palavra do servidor ($serverWord). Atualizando...');
+                }
+              }
+            }
+          } catch (e) {
+            // Em caso de erro na verificação, continuamos para atualizar por segurança
+            if (kDebugMode) {
+              print('Erro ao verificar a palavra no Firestore: $e');
+            }
+          }
+        }
+      }
+
+      // PASSO 3: Se necessário, atualizar o jogo com a nova palavra
+      if (needsRefresh) {
+        if (kDebugMode) {
+          print('Atualizando palavra do dia para: $currentDateStr');
+        }
+
+        // Buscar nova palavra do dia
+        final result = await _fetchNewDailyWord();
+
+        if (result != null) {
+          // Salvar o novo estado de jogo nas preferências
+          await _saveGameStateToPrefs(result);
+
+          emit(GameLoaded(
+            targetWord: result.targetWord,
+            guesses: result.guesses,
+            isCompleted: result.isCompleted,
+            bestScore: result.bestScore,
+            dailyWordId: result.dailyWordId,
+          ));
+
+          if (kDebugMode) {
+            print('Palavra do dia atualizada com sucesso para: ${result.targetWord}');
+          }
+        } else {
+          // Se falhou ao obter uma nova palavra, voltar ao estado anterior se existir
+          if (currentState != null) {
+            emit(currentState);
+          } else {
+            emit(const GameError(message: "Não foi possível obter a palavra do dia"));
+          }
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Erro ao atualizar palavra do dia: $e');
+      }
+
+      // Em caso de erro, voltar ao estado anterior se existir
+      if (state is GameLoaded) {
+        emit(GameError(
+          message: "Erro ao atualizar palavra do dia: ${e.toString()}",
+          previousState: state as GameLoaded,
+        ));
+        emit(state);
+      } else {
+        emit(GameError(message: "Erro ao atualizar palavra do dia: ${e.toString()}"));
+      }
     }
   }
 
-  // Busca nova palavra do dia
   Future<GameStateModel?> _fetchNewDailyWord() async {
     try {
-      // Obtém a data atual
+      // Obter a data atual
       final today = DateTime.now();
       final dateStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
 
-      // 1. Tenta obter a palavra do dia do Firestore
+      // 1. Tente obter a palavra do dia do Firestore
       final docSnapshot = await _firestore.collection('daily_words').doc(dateStr).get();
       String? targetWord;
 
@@ -351,31 +453,61 @@ class GameBloc extends Bloc<GameEvent, GameState> {
         }
       }
 
-      // 2. Se não encontrou no Firestore, usa método alternativo
-      if (targetWord == null) {
-        final wordResult = await _wordRepository.getDailyWord();
-        targetWord = wordResult.fold(
-                (failure) => null,
-                (word) => word
-        );
+      // 2. Se não encontrou no Firestore, use um método alternativo para obter uma palavra
+      if (targetWord == null || targetWord.trim().isEmpty) {
+        // Tenta usar o fallback de palavra aleatória na coleção words
+        final wordsSnapshot = await _firestore.collection('words').limit(50).get();
+
+        if (wordsSnapshot.docs.isNotEmpty) {
+          // Escolhe uma palavra aleatória da coleção
+          final random = DateTime.now().millisecondsSinceEpoch % wordsSnapshot.docs.length;
+          targetWord = wordsSnapshot.docs[random].id;
+
+          if (kDebugMode) {
+            print('Palavra não encontrada para hoje no Firestore, usando palavra aleatória da coleção words: $targetWord');
+          }
+
+          // Opcionalmente, salva esta palavra como a do dia (para outros usuários também)
+          try {
+            await _firestore.collection('daily_words').doc(dateStr).set({
+              'word': targetWord,
+              'timestamp': FieldValue.serverTimestamp(),
+              'auto_generated': true,
+            });
+          } catch (e) {
+            // Ignoramos erros ao tentar salvar
+            if (kDebugMode) {
+              print('Erro ao salvar palavra aleatória como palavra do dia: $e');
+            }
+          }
+        } else {
+          // Se falhar, use palavras básicas como fallback final
+          const fallbackWords = ['palavra', 'contexto', 'jogo', 'desafio', 'linguagem'];
+          final random = DateTime.now().millisecondsSinceEpoch % fallbackWords.length;
+          targetWord = fallbackWords[random];
+
+          if (kDebugMode) {
+            print('Nenhuma palavra encontrada no Firestore, usando palavra fallback básica: $targetWord');
+          }
+        }
       }
 
       if (targetWord != null) {
-        // Obtém melhor pontuação
-        final bestScore = await _gameRepository.getBestScore();
+        // Obter melhor pontuação
+        final bestScore = await _getBestScore();
 
-        // Cria novo estado de jogo
+        // Criar novo estado de jogo
         return GameStateModel(
           targetWord: targetWord,
-          guesses: [],
+          guesses: [], // Limpa todas as tentativas anteriores
           isCompleted: false,
-          bestScore: bestScore.fold((l) => 0, (score) => score),
+          bestScore: bestScore,
           dailyWordId: dateStr,
           wasShared: false,
         );
       }
 
-      return null;
+      throw Exception('Não foi possível obter uma palavra válida');
     } catch (e) {
       if (kDebugMode) {
         print('Erro ao obter nova palavra do dia: $e');
@@ -384,14 +516,73 @@ class GameBloc extends Bloc<GameEvent, GameState> {
     }
   }
 
-  // Salva o estado do jogo nas preferências
+  Future<int> _getBestScore() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getInt('best_score') ?? 0;
+    } catch (e) {
+      return 0;
+    }
+  }
+
   Future<void> _saveGameStateToPrefs(GameStateModel gameState) async {
     try {
-      await _prefs.setString(AppConstants.prefsKeyGameState, gameState.toRawJson());
+      final prefs = await SharedPreferences.getInstance();
+      final jsonString = gameState.toRawJson();
+      await prefs.setString('game_state', jsonString);
+
+      // Salvamos também a data em que este estado foi salvo
+      final dateStr = gameState.dailyWordId;
+      await prefs.setString('game_state_date', dateStr);
+
+      if (kDebugMode) {
+        print('Estado do jogo salvo com sucesso para data: ${gameState.dailyWordId}, palavra: ${gameState.targetWord}');
+      }
     } catch (e) {
       if (kDebugMode) {
         print('Erro ao salvar estado do jogo: $e');
       }
+    }
+  }
+
+  Future<GameStateModel?> _loadSavedGameState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final gameStateJson = prefs.getString('game_state');
+      final savedDate = prefs.getString('game_state_date');
+
+      if (gameStateJson != null) {
+        final state = GameStateModel.fromRawJson(gameStateJson);
+
+        // Obter a data atual
+        final today = DateTime.now();
+        final currentDateStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+
+        // Se o estado salvo NÃO corresponde à data atual, não use
+        if (state.dailyWordId != currentDateStr || savedDate != currentDateStr) {
+          if (kDebugMode) {
+            print('Estado do jogo encontrado, mas a data não corresponde à atual. ' +
+                'Data salva: ${state.dailyWordId}, Data atual: $currentDateStr');
+          }
+          return null;
+        }
+
+        if (kDebugMode) {
+          print('Estado do jogo carregado com sucesso para hoje. Palavra: ${state.targetWord}');
+        }
+
+        return state;
+      }
+
+      if (kDebugMode) {
+        print('Nenhum estado de jogo encontrado nas preferências');
+      }
+      return null;
+    } catch (e) {
+      if (kDebugMode) {
+        print('Erro ao carregar estado do jogo: $e');
+      }
+      return null;
     }
   }
 
