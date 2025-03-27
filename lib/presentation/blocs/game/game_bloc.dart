@@ -1,9 +1,11 @@
 // presentation/blocs/game/game_bloc.dart
 import 'dart:async';
+import 'dart:math';
 
 import 'package:bloc/bloc.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:contextual/core/constants/app_constants.dart';
+import 'package:contextual/data/datasources/remote/firebase_context_service.dart';
 import 'package:contextual/data/models/game_state.dart';
 import 'package:contextual/domain/entities/guess.dart';
 import 'package:contextual/domain/repositories/game_repository.dart';
@@ -83,6 +85,38 @@ class GameBloc extends Bloc<GameEvent, GameState> {
     }, onError: (error) {
       print('Erro no listener de palavra diária: $error');
     });
+  }
+
+  // Busca uma palavra de dica relacionada
+  String _getHintWord(GameLoaded state) {
+    final contextService = FirebaseContextService();
+
+    try {
+      // Obtém as relações da palavra-alvo
+      final relations = contextService.getWordRelations(state.targetWord.toLowerCase());
+
+      // Se existem relações, retorna a primeira palavra com similaridade alta
+      final relatedWords = relations.entries
+          .where((entry) => entry.value > 0.6) // Apenas palavras com similaridade acima de 60%
+          .map((entry) => entry.key)
+          .toList();
+
+      if (relatedWords.isNotEmpty) {
+        // Retorna uma palavra aleatória das relações
+        final random = Random();
+        return relatedWords[random.nextInt(relatedWords.length)];
+      }
+    } catch (e) {
+      print('Erro ao obter palavra de dica: $e');
+    }
+
+    // Fallback para dicas genéricas
+    final genericHints = [
+      'objeto', 'conceito', 'animal', 'lugar', 'ação',
+      'sentimento', 'natureza', 'tecnologia', 'pessoa',
+    ];
+
+    return genericHints[DateTime.now().microsecondsSinceEpoch % genericHints.length];
   }
 
   // Inicialização do jogo
@@ -200,12 +234,17 @@ class GameBloc extends Bloc<GameEvent, GameState> {
           emit(currentState);
         },
             (gameState) {
+          // Modifica a última tentativa se for uma dica
+          final updatedGuesses = gameState.guesses.map((guess) {
+            return event.isHint ? guess.copyWith(isHint: true) : guess;
+          }).toList();
+
           // Salva o novo estado
-          _saveGameStateToPrefs(gameState);
+          _saveGameStateToPrefs(gameState.copyWith(guesses: updatedGuesses));
 
           emit(GameLoaded(
             targetWord: gameState.targetWord,
-            guesses: gameState.guesses,
+            guesses: updatedGuesses,
             isCompleted: gameState.isCompleted,
             bestScore: gameState.bestScore,
             dailyWordId: gameState.dailyWordId,
@@ -368,7 +407,7 @@ class GameBloc extends Bloc<GameEvent, GameState> {
 
     if (currentState.isCompleted) {
       shareText += 'Encontrei a palavra ${currentState.targetWord.toUpperCase()} em ${currentState.guesses.length} tentativas!\n\n';
-    } else {
+    }  else {
       shareText += 'Ainda estou tentando...\n\n';
     }
 
