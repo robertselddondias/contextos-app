@@ -350,7 +350,12 @@ class _GameScreenState extends State<GameScreen> {
                   ),
                   SizedBox(height: context.responsiveSize(8)),
                   Text(
-                    '4. Tente acertar com o menor número possível de tentativas!',
+                    '4. Se a palavra não estiver no contexto semântico, ela será analisada por similaridade linguística, considerando aspectos como coincidência de letras com a palavra secreta.',
+                    style: TextStyle(fontSize: context.responsiveFontSize(14), fontWeight: FontWeight.bold),
+                  ),
+                  SizedBox(height: context.responsiveSize(8)),
+                  Text(
+                    '5. Tente acertar com o menor número possível de tentativas!',
                     style: TextStyle(fontSize: context.responsiveFontSize(14)),
                   ),
                   SizedBox(height: context.responsiveSize(16)),
