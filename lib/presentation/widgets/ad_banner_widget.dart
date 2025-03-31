@@ -16,11 +16,16 @@ class AdBannerWidget extends StatefulWidget {
 class _AdBannerWidgetState extends State<AdBannerWidget> {
   BannerAd? _bannerAd;
   bool _isAdLoaded = false;
+  final AdManager _adManager = AdManager();
+  bool _isPremium = false;
 
   @override
   void initState() {
     super.initState();
-    _loadBannerAd();
+    // Inicialização segura após o build completo do widget
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initialize();
+    });
   }
 
   @override
@@ -29,55 +34,80 @@ class _AdBannerWidgetState extends State<AdBannerWidget> {
     super.dispose();
   }
 
+  Future<void> _initialize() async {
+    await _adManager.initialize();
+
+    if (!mounted) return;
+
+    final isPremium = _adManager.isPremium;
+
+    setState(() {
+      _isPremium = isPremium;
+    });
+
+    if (!isPremium) {
+      // Só carrega o anúncio se não for premium
+      _loadBannerAd();
+    }
+  }
+
   Future<void> _loadBannerAd() async {
-    // Cria uma instância do AdManager mas NÃO usa o singleton diretamente
-    final adManager = AdManager();
+    if (!mounted) return;
 
-    // Determina o tamanho do banner
-    final AdSize adSize = await context.getAdaptiveBannerAdSize();
+    try {
+      // Usa o método seguro para obter o tamanho adaptativo
+      final adSize = await AdSizeExtension.getSafeAdaptiveBannerSize(context);
 
-    // Cria uma nova instância de BannerAd para cada widget
-    _bannerAd = BannerAd(
-      adUnitId: adManager.bannerAdUnitId,
-      size: adSize,
-      request: const AdRequest(),
-      listener: BannerAdListener(
-        onAdLoaded: (ad) {
-          if (mounted) {
-            setState(() {
-              _isAdLoaded = true;
-            });
-          }
-        },
-        onAdFailedToLoad: (ad, error) {
-          debugPrint('Falha ao carregar banner ad: ${error.message}');
-          ad.dispose();
-          if (mounted) {
-            setState(() {
-              _bannerAd = null;
-              _isAdLoaded = false;
-            });
-          }
-          // Tenta recarregar após falha
-          Future.delayed(const Duration(minutes: 1), () {
+      // Configura o banner ad
+      _bannerAd = BannerAd(
+        adUnitId: _adManager.bannerAdUnitId,
+        size: adSize,
+        request: const AdRequest(),
+        listener: BannerAdListener(
+          onAdLoaded: (ad) {
             if (mounted) {
-              _loadBannerAd();
+              setState(() {
+                _isAdLoaded = true;
+              });
             }
-          });
-        },
-      ),
-    );
+          },
+          onAdFailedToLoad: (ad, error) {
+            debugPrint('Falha ao carregar banner ad: ${error.message}');
+            ad.dispose();
 
-    // Carrega o anúncio
-    await _bannerAd?.load();
+            if (mounted) {
+              setState(() {
+                _bannerAd = null;
+                _isAdLoaded = false;
+              });
+            }
+
+            // Tenta recarregar após falha
+            Future.delayed(const Duration(minutes: 1), () {
+              if (mounted) {
+                _loadBannerAd();
+              }
+            });
+          },
+        ),
+      );
+
+      // Carrega o anúncio
+      await _bannerAd?.load();
+    } catch (e) {
+      debugPrint('Erro ao carregar banner ad: $e');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Se não houver anúncio carregado, retorna um espaço reservado
+    // Se for premium, não mostra anúncio
+    if (_isPremium) {
+      return const SizedBox.shrink();
+    }
+
+    // Se o anúncio não estiver carregado, mostra espaço reservado
     if (!_isAdLoaded || _bannerAd == null) {
-      // Retorna um espaço reservado com a altura de um banner padrão
-      // para evitar pulos no layout quando o anúncio carregar
       return Container(
         height: 50, // Altura aproximada de um banner padrão
         alignment: Alignment.center,

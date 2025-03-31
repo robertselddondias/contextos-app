@@ -13,6 +13,7 @@ import 'package:contextual/domain/repositories/word_repository.dart';
 import 'package:contextual/domain/usecases/get_daily_word.dart';
 import 'package:contextual/domain/usecases/make_guess.dart';
 import 'package:contextual/domain/usecases/save_game_state.dart';
+import 'package:contextual/services/premium_banner_service.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -165,6 +166,14 @@ class GameBloc extends Bloc<GameEvent, GameState> {
         }
       }
 
+      try {
+        final premiumBannerService = PremiumBannerService();
+        await premiumBannerService.trackGameSession(gameCompleted: false);
+      } catch (e) {
+        // Ignorar erros do banner
+        debugPrint('Erro ao notificar banner premium sobre nova sessão: $e');
+      }
+
       // Carrega estado salvo
       final savedGameState = GameStateModel.fromRawJson(savedGameStateJson!);
 
@@ -251,11 +260,19 @@ class GameBloc extends Bloc<GameEvent, GameState> {
           ));
           emit(currentState);
         },
-            (gameState) {
+            (gameState) async {
           // Modifica a última tentativa se for uma dica
           final updatedGuesses = gameState.guesses.map((guess) {
             return event.isHint ? guess.copyWith(isHint: true) : guess;
           }).toList();
+          if (gameState.isCompleted && !currentState.isCompleted) {
+            try {
+              final premiumBannerService = PremiumBannerService();
+              await premiumBannerService.trackGameSession(gameCompleted: true);
+            } catch (e) {
+              debugPrint('Erro ao notificar banner premium sobre conclusão do jogo: $e');
+            }
+          }
 
           // Salva o novo estado
           _saveGameStateToPrefs(gameState.copyWith(guesses: updatedGuesses));

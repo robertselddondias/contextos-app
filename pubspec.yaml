@@ -2,7 +2,7 @@ name: contextual
 description: Um jogo de adivinhação de palavras baseado em proximidade semântica.
 publish_to: 'none'
 #version: 1.0.2+1 IOS
-version: 1.0.0+1
+version: 1.0.0+2
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -42,7 +42,7 @@ dependencies:
 
   # Google NLP API
   googleapis: ^14.0.0
-  googleapis_auth: ^1.6.0
+  googleapis_auth: ^2.0.0
 
   google_mobile_ads: ^5.3.1
 

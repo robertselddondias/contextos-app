@@ -1,6 +1,5 @@
 // core/di/dependency_injection.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:contextual/core/init/initialize_firestore.dart';
 import 'package:contextual/data/datasources/local/shared_prefs_manager.dart';
 import 'package:contextual/data/datasources/remote/firebase_context_service.dart';
 import 'package:contextual/data/datasources/remote/firebase_nlp_service.dart';

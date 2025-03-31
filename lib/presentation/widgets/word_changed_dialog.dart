@@ -1,7 +1,7 @@
 // lib/presentation/dialogs/new_word_dialog.dart
-import 'package:flutter/material.dart';
 import 'package:contextual/core/constants/color_constants.dart';
 import 'package:contextual/utils/responsive_utils.dart';
+import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 
 class NewWordDialog extends StatelessWidget {

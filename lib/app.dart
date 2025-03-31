@@ -1,10 +1,11 @@
-// Modificação para app.dart
+// lib/app.dart
 import 'package:contextual/core/routes/app_routes.dart';
 import 'package:contextual/core/theme/app_theme.dart';
 import 'package:contextual/presentation/blocs/game/game_bloc.dart';
 import 'package:contextual/presentation/blocs/settings/settings_bloc.dart';
 import 'package:contextual/presentation/screens/onboarding_screen.dart';
 import 'package:contextual/presentation/screens/splash_screen.dart';
+import 'package:contextual/presentation/widgets/premium_banner_wrapper.dart';
 import 'package:contextual/utils/keyboard_dismisser.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -42,7 +43,7 @@ class ContextoApp extends StatelessWidget {
         previous.themeMode != current.themeMode ||
             previous.locale != current.locale,
         builder: (context, state) {
-          // Envolva o MaterialApp com o DateChangeDetector
+          // Envolva o MaterialApp com o AppKeyboardManager e PremiumBannerWrapper
           return AppKeyboardManager(
             child: MaterialApp(
               title: 'Contexto',
@@ -62,22 +63,28 @@ class ContextoApp extends StatelessWidget {
               ],
               locale: state.locale,
               routes: AppRoutes.routes,
-              home: FutureBuilder<bool>(
-                future: _shouldShowOnboarding(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const SplashScreen();
-                  }
+              home: PremiumBannerWrapper(
+                child: FutureBuilder<bool>(
+                  future: _shouldShowOnboarding(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const SplashScreen();
+                    }
 
-                  final shouldShowOnboarding = snapshot.data ?? false;
+                    final shouldShowOnboarding = snapshot.data ?? false;
 
-                  if (shouldShowOnboarding) {
-                    return const OnboardingScreen();
-                  } else {
-                    return const SplashScreen();
-                  }
-                },
+                    if (shouldShowOnboarding) {
+                      return const OnboardingScreen();
+                    } else {
+                      return const SplashScreen();
+                    }
+                  },
+                ),
               ),
+              builder: (context, child) {
+                // Envolve todas as rotas com o PremiumBannerWrapper
+                return PremiumBannerWrapper(child: child!);
+              },
             ),
           );
         },

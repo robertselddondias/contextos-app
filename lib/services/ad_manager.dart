@@ -6,62 +6,62 @@ import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// A comprehensive service for managing ads on iOS and Android platforms.
-/// 
-/// This class handles initialization, loading, and displaying of various ad formats
-/// including banners, interstitials, and rewarded ads in a cross-platform way.
+/// Gerenciador de anúncios para iOS e Android.
+///
+/// Esta classe gerencia a inicialização, carregamento e exibição de diferentes formatos de anúncios
+/// incluindo banners, intersticiais e anúncios recompensados.
 class AdManager {
   // Singleton pattern
   static final AdManager _instance = AdManager._internal();
   factory AdManager() => _instance;
   AdManager._internal();
 
-  // Initialization state tracking
+  // Rastreamento de inicialização
   bool _isInitialized = false;
   bool get isInitialized => _isInitialized;
 
-  // Premium status tracking
+  // Rastreamento de status premium
   bool _isPremium = false;
   bool get isPremium => _isPremium;
 
-  // Test mode flag (for development)
+  // Flag de modo de teste (para desenvolvimento)
   final bool _useTestAds = false;
 
-  // Ad instances
+  // Instâncias de anúncios
   BannerAd? _bannerAd;
   InterstitialAd? _interstitialAd;
   RewardedAd? _rewardedAd;
 
-  // Ad states
+  // Estados dos anúncios
   bool _isBannerAdLoaded = false;
   bool get isBannerAdLoaded => _isBannerAdLoaded;
   bool get isInterstitialAdReady => _interstitialAd != null;
   bool get isRewardedAdReady => _rewardedAd != null;
 
-  // Ad tracking
+  // Rastreamento de anúncios
   int _interstitialAdCount = 0;
   DateTime? _lastInterstitialShown;
-  int _interstitialFrequency = 3; // Show after every X game completions
+  int _interstitialFrequency = 3; // Mostrar a cada X conclusões de jogo
 
-  // Test ad unit IDs
-  static const String _testBannerAdUnitId = 'ca-app-pub-4458700759850229/6473230385';
-  static const String _testInterstitialAdUnitId = 'ca-app-pub-4458700759850229/5755178538';
-  static const String _testRewardedAdUnitId = 'ca-app-pub-4458700759850229/2533985374';
+  // IDs de anúncios de teste
+  static const String _testBannerAdUnitId = 'ca-app-pub-3940256099942544/6300978111';
+  static const String _testInterstitialAdUnitId = 'ca-app-pub-3940256099942544/1033173712';
+  static const String _testRewardedAdUnitId = 'ca-app-pub-3940256099942544/5224354917';
 
-  // Production ad unit IDs
-  // Replace these with your actual production ad unit IDs
+  // IDs de anúncios de produção
+  // Substitua por seus IDs reais de produção
   static const String _iosBannerAdUnitId = 'ca-app-pub-4458700759850229/6473230385';
-  static const String _androidBannerAdUnitId = 'ca-app-pub-4458700759850229/7238682990';
+  static const String _androidBannerAdUnitId = 'ca-app-pub-4458700759850229/8802856159';
 
   static const String _iosInterstitialAdUnitId = 'ca-app-pub-4458700759850229/5755178538';
-  static const String _androidInterstitialAdUnitId = 'ca-app-pub-4458700759850229/5850214168';
+  static const String _androidInterstitialAdUnitId = 'ca-app-pub-4458700759850229/3047966594';
 
   static const String _iosRewardedAdUnitId = 'ca-app-pub-4458700759850229/2533985374';
-  static const String _androidRewardedAdUnitId = 'ca-app-pub-4458700759850229/4442096867';
+  static const String _androidRewardedAdUnitId = 'ca-app-pub-4458700759850229/3497724431';
 
   final PurchaseManager _purchaseManager = PurchaseManager();
 
-  // Getters for ad unit IDs based on platform and test mode
+  // Getters para IDs de anúncios baseados na plataforma e modo de teste
   String get bannerAdUnitId {
     if (_useTestAds) return _testBannerAdUnitId;
     return Platform.isIOS ? _iosBannerAdUnitId : _androidBannerAdUnitId;
@@ -79,353 +79,271 @@ class AdManager {
 
   Future<void> initialize() async {
     if (_isInitialized) {
-      debugPrint('AdService: Already initialized');
+      debugPrint('AdManager: Já inicializado');
       return;
     }
 
     try {
+      // Inicializa o SDK do Mobile Ads
+      await MobileAds.instance.initialize();
+      debugPrint('AdManager: SDK do Mobile Ads inicializado com sucesso');
+
       // Inicializa o gerenciador de compras
       await _purchaseManager.initialize();
 
       // Se o usuário comprou remover anúncios, não inicializamos os anúncios
       _isPremium = _purchaseManager.removeAdsActive;
 
-      // Inscreve-se nas mudanças do estado de compra para atualizar o estado premium
+      // Inscreve-se nas mudanças do estado de compra para atualizar o status premium
       _purchaseManager.purchaseStateStream.listen((isPremiumActive) {
         _isPremium = isPremiumActive;
-        debugPrint('AdService: Premium status updated to $_isPremium');
+        debugPrint('AdManager: Status premium atualizado para $_isPremium');
       });
 
       // Se o usuário é premium, apenas marcamos como inicializado e saímos
       if (_isPremium) {
         _isInitialized = true;
-        debugPrint('AdService: Initialized in premium mode (ads disabled)');
+        debugPrint('AdManager: Inicializado no modo premium (anúncios desativados)');
         return;
       }
 
-      // Initialize the Mobile Ads SDK
-      await MobileAds.instance.initialize();
-
-      // Load user premium status
+      // Carrega status premium do usuário
       await _loadPremiumStatus();
 
-      // Skip further ad loading if user is premium
+      // Pula o carregamento de anúncios se o usuário for premium
       if (_isPremium) {
         _isInitialized = true;
-        debugPrint('AdService: Initialized in premium mode (ads disabled)');
+        debugPrint('AdManager: Inicializado no modo premium (anúncios desativados)');
         return;
       }
 
-      // Load interstitial and rewarded ads
+      // Carrega anúncios intersticial e recompensado
       _loadInterstitialAd();
       _loadRewardedAd();
 
-      // Load settings
+      // Carrega configurações
       await _loadSettings();
 
       _isInitialized = true;
-      debugPrint('AdService: Initialized successfully');
+      debugPrint('AdManager: Inicializado com sucesso');
     } catch (e) {
-      debugPrint('AdService: Error during initialization: $e');
-      // Mark as initialized anyway to prevent repeated initialization attempts
+      debugPrint('AdManager: Erro durante a inicialização: $e');
+      // Marca como inicializado para evitar tentativas repetidas de inicialização
       _isInitialized = true;
     }
   }
 
-  /// Load user premium status from shared preferences.
+  /// Carrega o status premium do usuário a partir das preferências compartilhadas.
   Future<void> _loadPremiumStatus() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       _isPremium = prefs.getBool('premium_user') ?? false;
-      debugPrint('AdService: Premium status loaded: $_isPremium');
+      debugPrint('AdManager: Status premium carregado: $_isPremium');
     } catch (e) {
-      debugPrint('AdService: Error loading premium status: $e');
+      debugPrint('AdManager: Erro ao carregar status premium: $e');
       _isPremium = false;
     }
   }
 
-  /// Load ad-related settings from shared preferences.
+  /// Carrega configurações relacionadas a anúncios das preferências compartilhadas.
   Future<void> _loadSettings() async {
     try {
       final prefs = await SharedPreferences.getInstance();
 
-      // Load interstitial frequency setting
+      // Carrega configuração de frequência de anúncios intersticial
       _interstitialFrequency = prefs.getInt('interstitial_frequency') ?? 3;
 
-      // Load interstitial ad count
+      // Carrega contagem de anúncios intersticial
       _interstitialAdCount = prefs.getInt('interstitial_ad_count') ?? 0;
 
-      // Load last shown timestamp
+      // Carrega timestamp da última exibição
       final lastShownStr = prefs.getString('last_interstitial_shown');
       if (lastShownStr != null) {
         _lastInterstitialShown = DateTime.parse(lastShownStr);
       }
 
-      debugPrint('AdService: Settings loaded');
+      debugPrint('AdManager: Configurações carregadas');
     } catch (e) {
-      debugPrint('AdService: Error loading settings: $e');
-      // Use defaults if settings couldn't be loaded
+      debugPrint('AdManager: Erro ao carregar configurações: $e');
+      // Usa padrões se as configurações não puderem ser carregadas
       _interstitialFrequency = 3;
       _interstitialAdCount = 0;
       _lastInterstitialShown = null;
     }
   }
 
-  /// Save ad-related settings to shared preferences.
+  /// Salva configurações relacionadas a anúncios nas preferências compartilhadas.
   Future<void> _saveSettings() async {
     try {
       final prefs = await SharedPreferences.getInstance();
 
-      // Save interstitial ad count
+      // Salva contagem de anúncios intersticial
       await prefs.setInt('interstitial_ad_count', _interstitialAdCount);
 
-      // Save last shown timestamp
+      // Salva timestamp da última exibição
       if (_lastInterstitialShown != null) {
         await prefs.setString('last_interstitial_shown', _lastInterstitialShown!.toIso8601String());
       }
 
-      debugPrint('AdService: Settings saved');
+      debugPrint('AdManager: Configurações salvas');
     } catch (e) {
-      debugPrint('AdService: Error saving settings: $e');
+      debugPrint('AdManager: Erro ao salvar configurações: $e');
     }
   }
 
-  /// Update user premium status.
+  /// Carrega um anúncio intersticial.
   ///
-  /// Use this when a user purchases premium features or removes ads.
-  Future<void> setPremiumStatus(bool isPremium) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('premium_user', isPremium);
-      _isPremium = isPremium;
-
-      // Dispose of all ads if user upgraded to premium
-      if (isPremium) {
-        _disposeBannerAd();
-        _disposeInterstitialAd();
-        _disposeRewardedAd();
-      }
-
-      debugPrint('AdService: Premium status updated: $isPremium');
-    } catch (e) {
-      debugPrint('AdService: Error updating premium status: $e');
-    }
-  }
-
-  /// Load a banner ad.
-  ///
-  /// This method should be called when you want to display a banner ad.
-  /// The result can be accessed via isBannerAdLoaded property.
-  Future<void> loadBannerAd({AdSize? size}) async {
-    if (_isPremium) return;
-    if (!_isInitialized) await initialize();
-
-    // Dispose of any existing banner ad
-    _disposeBannerAd();
-
-    try {
-      // Use standard banner size if not specified
-      final adSize = size ?? AdSize.banner;
-
-      _bannerAd = BannerAd(
-        adUnitId: bannerAdUnitId,
-        size: adSize,
-        request: const AdRequest(),
-        listener: BannerAdListener(
-          onAdLoaded: (ad) {
-            debugPrint('AdService: Banner ad loaded');
-            _isBannerAdLoaded = true;
-          },
-          onAdFailedToLoad: (ad, error) {
-            debugPrint('AdService: Banner ad failed to load: ${error.message}');
-            ad.dispose();
-            _bannerAd = null;
-            _isBannerAdLoaded = false;
-
-            // Retry loading after a delay
-            Future.delayed(const Duration(minutes: 1), () {
-              if (!_isPremium) loadBannerAd(size: size);
-            });
-          },
-          onAdOpened: (ad) => debugPrint('AdService: Banner ad opened'),
-          onAdClosed: (ad) => debugPrint('AdService: Banner ad closed'),
-          onAdImpression: (ad) => debugPrint('AdService: Banner ad impression'),
-        ),
-      );
-
-      await _bannerAd!.load();
-      debugPrint('AdService: Banner ad load requested');
-    } catch (e) {
-      debugPrint('AdService: Error loading banner ad: $e');
-      _isBannerAdLoaded = false;
-      _bannerAd = null;
-    }
-  }
-
-  /// Get the current banner ad.
-  ///
-  /// Returns null if no banner ad is loaded or user is premium.
-  BannerAd? getBannerAd() {
-    if (_isPremium) return null;
-    return _bannerAd;
-  }
-
-  /// Dispose of the current banner ad.
-  void _disposeBannerAd() {
-    _bannerAd?.dispose();
-    _bannerAd = null;
-    _isBannerAdLoaded = false;
-  }
-
-  /// Load an interstitial ad.
-  ///
-  /// This method is called automatically during initialization and after
-  /// an interstitial ad is shown.
+  /// Este método é chamado automaticamente durante a inicialização e após
+  /// a exibição de um anúncio intersticial.
   void _loadInterstitialAd() {
     if (_isPremium) return;
     if (!_isInitialized && !kDebugMode) return;
 
     try {
+      debugPrint('AdManager: Carregando anúncio intersticial com ID: $interstitialAdUnitId');
+
       InterstitialAd.load(
         adUnitId: interstitialAdUnitId,
         request: const AdRequest(),
         adLoadCallback: InterstitialAdLoadCallback(
           onAdLoaded: (ad) {
             _interstitialAd = ad;
-            debugPrint('AdService: Interstitial ad loaded');
+            debugPrint('AdManager: Anúncio intersticial carregado');
 
-            // Set up full-screen content callback
+            // Configura callback de conteúdo em tela cheia
             _interstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
               onAdShowedFullScreenContent: (ad) {
-                debugPrint('AdService: Interstitial ad showed full screen content');
+                debugPrint('AdManager: Anúncio intersticial mostrou conteúdo em tela cheia');
               },
               onAdDismissedFullScreenContent: (ad) {
-                debugPrint('AdService: Interstitial ad dismissed');
+                debugPrint('AdManager: Anúncio intersticial descartado');
                 ad.dispose();
                 _interstitialAd = null;
 
-                // Reload ad for next use
+                // Recarrega anúncio para próximo uso
                 _loadInterstitialAd();
               },
               onAdFailedToShowFullScreenContent: (ad, error) {
-                debugPrint('AdService: Interstitial ad failed to show: ${error.message}');
+                debugPrint('AdManager: Anúncio intersticial falhou ao mostrar: ${error.message}');
                 ad.dispose();
                 _interstitialAd = null;
 
-                // Reload ad for next use
+                // Recarrega anúncio para próximo uso
                 _loadInterstitialAd();
               },
               onAdImpression: (ad) {
-                debugPrint('AdService: Interstitial ad impression');
+                debugPrint('AdManager: Impressão de anúncio intersticial');
               },
             );
           },
           onAdFailedToLoad: (error) {
-            debugPrint('AdService: Interstitial ad failed to load: ${error.message}');
+            debugPrint('AdManager: Anúncio intersticial falhou ao carregar: ${error.message}, código: ${error.code}');
             _interstitialAd = null;
 
-            // Retry loading after a delay
+            // Tenta carregar novamente após um atraso
             Future.delayed(const Duration(minutes: 1), _loadInterstitialAd);
           },
         ),
       );
 
-      debugPrint('AdService: Interstitial ad load requested');
+      debugPrint('AdManager: Solicitação de carregamento de anúncio intersticial enviada');
     } catch (e) {
-      debugPrint('AdService: Error loading interstitial ad: $e');
+      debugPrint('AdManager: Erro ao carregar anúncio intersticial: $e');
       _interstitialAd = null;
     }
   }
 
-  /// Dispose of the current interstitial ad.
+  /// Descarta o anúncio intersticial atual.
   void _disposeInterstitialAd() {
     _interstitialAd?.dispose();
     _interstitialAd = null;
   }
 
-  /// Load a rewarded ad.
+  /// Carrega um anúncio recompensado.
   ///
-  /// This method is called automatically during initialization and after
-  /// a rewarded ad is shown.
+  /// Este método é chamado automaticamente durante a inicialização e após
+  /// a exibição de um anúncio recompensado.
   void _loadRewardedAd() {
     if (_isPremium) return;
     if (!_isInitialized && !kDebugMode) return;
 
     try {
+      debugPrint('AdManager: Carregando anúncio recompensado com ID: $rewardedAdUnitId');
+
       RewardedAd.load(
         adUnitId: rewardedAdUnitId,
         request: const AdRequest(),
         rewardedAdLoadCallback: RewardedAdLoadCallback(
           onAdLoaded: (ad) {
             _rewardedAd = ad;
-            debugPrint('AdService: Rewarded ad loaded');
+            debugPrint('AdManager: Anúncio recompensado carregado');
 
-            // Set up full-screen content callback
+            // Configura callback de conteúdo em tela cheia
             _rewardedAd!.fullScreenContentCallback = FullScreenContentCallback(
               onAdShowedFullScreenContent: (ad) {
-                debugPrint('AdService: Rewarded ad showed full screen content');
+                debugPrint('AdManager: Anúncio recompensado mostrou conteúdo em tela cheia');
               },
               onAdDismissedFullScreenContent: (ad) {
-                debugPrint('AdService: Rewarded ad dismissed');
+                debugPrint('AdManager: Anúncio recompensado descartado');
                 ad.dispose();
                 _rewardedAd = null;
 
-                // Reload ad for next use
+                // Recarrega anúncio para próximo uso
                 _loadRewardedAd();
               },
               onAdFailedToShowFullScreenContent: (ad, error) {
-                debugPrint('AdService: Rewarded ad failed to show: ${error.message}');
+                debugPrint('AdManager: Anúncio recompensado falhou ao mostrar: ${error.message}');
                 ad.dispose();
                 _rewardedAd = null;
 
-                // Reload ad for next use
+                // Recarrega anúncio para próximo uso
                 _loadRewardedAd();
               },
               onAdImpression: (ad) {
-                debugPrint('AdService: Rewarded ad impression');
+                debugPrint('AdManager: Impressão de anúncio recompensado');
               },
             );
           },
           onAdFailedToLoad: (error) {
-            debugPrint('AdService: Rewarded ad failed to load: ${error.message}');
+            debugPrint('AdManager: Anúncio recompensado falhou ao carregar: ${error.message}, código: ${error.code}');
             _rewardedAd = null;
 
-            // Retry loading after a delay
+            // Tenta carregar novamente após um atraso
             Future.delayed(const Duration(minutes: 1), _loadRewardedAd);
           },
         ),
       );
 
-      debugPrint('AdService: Rewarded ad load requested');
+      debugPrint('AdManager: Solicitação de carregamento de anúncio recompensado enviada');
     } catch (e) {
-      debugPrint('AdService: Error loading rewarded ad: $e');
+      debugPrint('AdManager: Erro ao carregar anúncio recompensado: $e');
       _rewardedAd = null;
     }
   }
 
-  /// Dispose of the current rewarded ad.
+  /// Descarta o anúncio recompensado atual.
   void _disposeRewardedAd() {
     _rewardedAd?.dispose();
     _rewardedAd = null;
   }
 
-  /// Show an interstitial ad.
+  /// Mostra um anúncio intersticial.
   ///
-  /// Returns true if the ad was shown, false otherwise.
-  /// This method respects frequency capping and ensures a minimum time between ads.
+  /// Retorna true se o anúncio foi mostrado, false caso contrário.
+  /// Este método respeita o limite de frequência e garante um tempo mínimo entre anúncios.
   Future<bool> showInterstitial() async {
     if (_isPremium || _interstitialAd == null) return false;
 
-    // Increment counter for frequency capping
+    // Incrementa contador para limite de frequência
     _interstitialAdCount++;
     await _saveSettings();
 
-    // Check frequency cap
+    // Verifica limite de frequência
     if (_interstitialAdCount % _interstitialFrequency != 0) {
       return false;
     }
 
-    // Check minimum time between ads (1 minute)
+    // Verifica tempo mínimo entre anúncios (1 minuto)
     if (_lastInterstitialShown != null) {
       final timeSinceLastAd = DateTime.now().difference(_lastInterstitialShown!);
       if (timeSinceLastAd.inMinutes < 1) {
@@ -433,16 +351,16 @@ class AdManager {
       }
     }
 
-    // Show the ad
+    // Mostra o anúncio
     try {
       await _interstitialAd!.show();
       _lastInterstitialShown = DateTime.now();
       await _saveSettings();
-      debugPrint('AdService: Interstitial ad shown');
+      debugPrint('AdManager: Anúncio intersticial mostrado');
       return true;
     } catch (e) {
-      debugPrint('AdService: Error showing interstitial ad: $e');
-      // Reload after error
+      debugPrint('AdManager: Erro ao mostrar anúncio intersticial: $e');
+      // Recarrega após erro
       _interstitialAd?.dispose();
       _interstitialAd = null;
       _loadInterstitialAd();
@@ -450,9 +368,9 @@ class AdManager {
     }
   }
 
-  /// Called to notify the service about a game completion for interstitial frequency calculations.
+  /// Método chamado para notificar o serviço sobre a conclusão de um jogo para cálculos de frequência intersticial.
   ///
-  /// Returns true if an interstitial ad was shown, false otherwise.
+  /// Retorna true se um anúncio intersticial foi mostrado, false caso contrário.
   Future<bool> notifyGameCompleted() async {
     if (_isPremium) return false;
     if (!_isInitialized) await initialize();
@@ -460,10 +378,10 @@ class AdManager {
     return showInterstitial();
   }
 
-  /// Show a rewarded ad.
+  /// Mostra um anúncio recompensado.
   ///
-  /// Returns true if the user earned the reward, false otherwise.
-  /// Optionally accepts a callback to handle the reward.
+  /// Retorna true se o usuário ganhou a recompensa, false caso contrário.
+  /// Opcionalmente aceita um callback para lidar com a recompensa.
   Future<bool> showRewardedAd({Function(RewardItem)? onRewarded}) async {
     if (_isPremium || _rewardedAd == null) return false;
 
@@ -471,23 +389,23 @@ class AdManager {
 
     try {
       await _rewardedAd!.show(onUserEarnedReward: (ad, reward) {
-        // Call the reward callback if provided
+        // Chama o callback de recompensa se fornecido
         if (onRewarded != null) {
           onRewarded(reward);
         }
 
-        debugPrint('AdService: User earned reward: ${reward.amount} ${reward.type}');
+        debugPrint('AdManager: Usuário ganhou recompensa: ${reward.amount} ${reward.type}');
         if (!completer.isCompleted) {
           completer.complete(true);
         }
       });
 
-      // The fullScreenContentCallback will handle ad closing and errors
+      // O fullScreenContentCallback lidará com o fechamento e erros do anúncio
 
     } catch (e) {
-      debugPrint('AdService: Error showing rewarded ad: $e');
+      debugPrint('AdManager: Erro ao mostrar anúncio recompensado: $e');
 
-      // Reload after error
+      // Recarrega após erro
       _rewardedAd?.dispose();
       _rewardedAd = null;
       _loadRewardedAd();
@@ -500,7 +418,7 @@ class AdManager {
     return completer.future;
   }
 
-  /// Set the frequency of interstitial ads (how many game completions between ads).
+  /// Define a frequência de anúncios intersticiais (quantas conclusões de jogo entre anúncios).
   Future<void> setInterstitialFrequency(int frequency) async {
     try {
       if (frequency < 1) frequency = 1;
@@ -510,42 +428,19 @@ class AdManager {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt('interstitial_frequency', frequency);
 
-      debugPrint('AdService: Interstitial frequency set to $frequency');
+      debugPrint('AdManager: Frequência intersticial definida para $frequency');
     } catch (e) {
-      debugPrint('AdService: Error setting interstitial frequency: $e');
+      debugPrint('AdManager: Erro ao definir frequência intersticial: $e');
     }
   }
 
-  /// Request a specific banner ad size for the current screen.
-  /// 
-  /// Calculates and returns the best banner ad size for the current device screen.
-  Future<AdSize> getAdaptiveBannerAdSize(double width) async {
-    // Use adaptive banner if available
-    if (!_isPremium) {
-      try {
-        final AnchoredAdaptiveBannerAdSize? adaptiveSize =
-        await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(
-            width.truncate());
-
-        if (adaptiveSize != null) {
-          return adaptiveSize;
-        }
-      } catch (e) {
-        debugPrint('AdService: Error getting adaptive banner size: $e');
-      }
-    }
-
-    // Fallback to standard banner
-    return AdSize.banner;
-  }
-
-  /// Clean up all ad resources.
+  /// Limpa todos os recursos de anúncios.
   ///
-  /// Call this method when the app is being closed or when ads are no longer needed.
+  /// Chame este método quando o aplicativo estiver sendo fechado ou quando os anúncios não forem mais necessários.
   void dispose() {
-    _disposeBannerAd();
-    _disposeInterstitialAd();
-    _disposeRewardedAd();
-    debugPrint('AdService: Disposed all ad resources');
+    _bannerAd?.dispose();
+    _interstitialAd?.dispose();
+    _rewardedAd?.dispose();
+    debugPrint('AdManager: Todos os recursos de anúncios foram liberados');
   }
 }

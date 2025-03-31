@@ -1,8 +1,8 @@
 // lib/presentation/screens/settings_screen.dart
 import 'package:contextual/core/constants/color_constants.dart';
-import 'package:contextual/presentation/blocs/game/game_bloc.dart';
 import 'package:contextual/presentation/blocs/settings/settings_bloc.dart';
 import 'package:contextual/presentation/widgets/purchase_button.dart';
+import 'package:contextual/services/premium_banner_service.dart';
 import 'package:contextual/services/smart_notification_service.dart';
 import 'package:contextual/utils/app_version_helper.dart';
 import 'package:contextual/utils/responsive_utils.dart';
@@ -609,8 +609,59 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           onTap: () => _sendTestNotification(context),
         ),
+        ListTile(
+          title: Text(
+            'Resetar banner premium',
+            style: TextStyle(fontSize: context.responsiveFontSize(14)),
+          ),
+          subtitle: Text(
+            'Limpa os dados de exibição do banner premium',
+            style: TextStyle(fontSize: context.responsiveFontSize(12)),
+          ),
+          trailing: Icon(
+            Icons.refresh,
+            size: context.responsiveSize(22),
+          ),
+          contentPadding: EdgeInsets.symmetric(
+            horizontal: context.responsiveValue(
+              small: 12.0,
+              medium: 16.0,
+              large: 20.0,
+            ),
+            vertical: context.responsiveValue(
+              small: 4.0,
+              medium: 8.0,
+              large: 12.0,
+            ),
+          ),
+          onTap: () => _resetPremiumBanner(context),
+        )
       ],
     );
+  }
+
+  Future<void> _resetPremiumBanner(BuildContext context) async {
+    try {
+      await PremiumBannerService().resetBannerData();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Banner premium resetado. Você verá o banner na próxima sessão.'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao resetar banner premium: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   // Enviar notificação de teste

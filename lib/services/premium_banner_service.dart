@@ -19,7 +19,7 @@ class PremiumBannerService {
   static const String _bannerConfigDoc = 'premium_banner';
 
   // Configurações padrão (fallback) caso não consiga buscar do Firebase
-  static const int _defaultMinIntervalHours = 24; // Intervalo mínimo entre exibições
+  static const int _defaultMinIntervalHours = 24; // Intervalo mínimo entre exibições (24h = 1 dia)
   static const int _defaultMinGameSessions = 3; // Sessões mínimas antes de mostrar
   static const int _defaultMaxShowsPerUser = 8; // Máximo de exibições por usuário
 
@@ -59,8 +59,15 @@ class PremiumBannerService {
       // Carrega configurações do Firebase
       await _loadConfigFromFirebase();
 
-      // Verifica condições para mostrar o banner
-      await _checkShouldShowBanner();
+      // Verifica se o banner já foi exibido hoje
+      if (await _wasBannerShownToday()) {
+        _shouldShowBanner = false;
+        _showBannerController.add(false);
+        debugPrint('PremiumBannerService: Banner já foi exibido hoje, não será mostrado novamente');
+      } else {
+        // Se não foi exibido hoje, verifica outras condições
+        await _checkShouldShowBanner();
+      }
 
       // Escutar mudanças nas compras para atualizar o estado do banner
       _purchaseManager.purchaseStateStream.listen((isPremium) {
@@ -73,17 +80,37 @@ class PremiumBannerService {
       _isInitialized = true;
 
       if (kDebugMode) {
-        print('PremiumBannerService inicializado: exibir banner = $_shouldShowBanner');
-        print('Configuração: $_config');
+        debugPrint('PremiumBannerService inicializado: exibir banner = $_shouldShowBanner');
+        debugPrint('Configuração: $_config');
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Erro ao inicializar PremiumBannerService: $e');
+        debugPrint('Erro ao inicializar PremiumBannerService: $e');
       }
 
       // Mesmo com erro, marcamos como inicializado
       _isInitialized = true;
+      _shouldShowBanner = false; // Não mostra o banner em caso de erro
+      _showBannerController.add(false);
     }
+  }
+
+  /// Verifica se o banner já foi exibido hoje
+  Future<bool> _wasBannerShownToday() async {
+    final prefs = await SharedPreferences.getInstance();
+    final lastShownStr = prefs.getString(_prefKeyLastShown);
+
+    if (lastShownStr == null) {
+      return false; // Nunca foi mostrado
+    }
+
+    final lastShown = DateTime.parse(lastShownStr);
+    final now = DateTime.now();
+
+    // Verifica se a data da última exibição é a mesma de hoje
+    return lastShown.year == now.year &&
+        lastShown.month == now.month &&
+        lastShown.day == now.day;
   }
 
   /// Carrega configurações do Firebase
@@ -98,18 +125,18 @@ class PremiumBannerService {
         _config = docSnapshot.data() ?? {};
 
         if (kDebugMode) {
-          print('Configurações do banner premium carregadas do Firebase');
+          debugPrint('Configurações do banner premium carregadas do Firebase');
         }
       } else {
         _config = _getDefaultConfig();
 
         if (kDebugMode) {
-          print('Configurações padrão do banner premium carregadas (Firebase não disponível)');
+          debugPrint('Configurações padrão do banner premium carregadas (Firebase não disponível)');
         }
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Erro ao carregar configurações do Firebase: $e');
+        debugPrint('Erro ao carregar configurações do Firebase: $e');
       }
 
       // Usa configurações padrão em caso de erro
@@ -198,11 +225,11 @@ class PremiumBannerService {
       _showBannerController.add(false);
 
       if (kDebugMode) {
-        print('Banner premium marcado como exibido. Total de exibições: ${currentCount + 1}');
+        debugPrint('Banner premium marcado como exibido. Total de exibições: ${currentCount + 1}');
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Erro ao registrar exibição do banner: $e');
+        debugPrint('Erro ao registrar exibição do banner: $e');
       }
     }
   }
@@ -214,6 +241,11 @@ class PremiumBannerService {
     // Verifica se já é premium
     if (_purchaseManager.removeAdsActive) return;
 
+    // Verifica se o banner já foi exibido hoje
+    if (await _wasBannerShownToday()) {
+      return; // Não mostra novamente no mesmo dia
+    }
+
     try {
       final prefs = await SharedPreferences.getInstance();
 
@@ -221,7 +253,8 @@ class PremiumBannerService {
       final showAfterComplete = _config['show_after_game_complete'] ?? true;
 
       if (gameCompleted && showAfterComplete) {
-        await _checkShouldShowBanner();
+        _shouldShowBanner = true;
+        _showBannerController.add(true);
         return;
       }
 
@@ -233,12 +266,22 @@ class PremiumBannerService {
       final minSessions = _config['min_game_sessions'] ?? _defaultMinGameSessions;
 
       if (newCount >= minSessions) {
-        await _checkShouldShowBanner();
+        _shouldShowBanner = true;
+        _showBannerController.add(true);
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Erro ao rastrear sessão de jogo: $e');
+        debugPrint('Erro ao rastrear sessão de jogo: $e');
       }
+    }
+  }
+
+  /// Força a exibição do banner (útil para debugging)
+  void forceShowBanner() {
+    _shouldShowBanner = true;
+    _showBannerController.add(true);
+    if (kDebugMode) {
+      debugPrint('PremiumBannerService: Banner forçado manualmente');
     }
   }
 
@@ -252,6 +295,18 @@ class PremiumBannerService {
       'primary': primaryMessage,
       'secondary': secondaryMessage,
     };
+  }
+
+  /// Limpa os dados do banner (para testes)
+  Future<void> resetBannerData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_prefKeyLastShown);
+      await prefs.remove(_prefKeyShowCount);
+      debugPrint('PremiumBannerService: Dados do banner resetados');
+    } catch (e) {
+      debugPrint('PremiumBannerService: Erro ao resetar dados do banner: $e');
+    }
   }
 
   /// Libera recursos

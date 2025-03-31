@@ -10,7 +10,7 @@ extension AdSizeExtension on BuildContext {
     final width = MediaQuery.of(this).size.width.toInt();
 
     try {
-      // Obtém o tamanho adaptativo para a orientação atual (compatível com versão 5.3.1)
+      // Versão mais recente do google_mobile_ads (2024)
       final AnchoredAdaptiveBannerAdSize? adaptiveSize =
       await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(width);
 
@@ -31,8 +31,9 @@ extension AdSizeExtension on BuildContext {
     final width = MediaQuery.of(this).size.width.toInt();
 
     try {
-      final AdSize? adaptiveSize =
-          await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(width);
+      // Obtém o tamanho para dispositivos em modo retrato
+      final AnchoredAdaptiveBannerAdSize? adaptiveSize =
+      await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(width);
 
       if (adaptiveSize != null) {
         return adaptiveSize;
@@ -49,8 +50,9 @@ extension AdSizeExtension on BuildContext {
     final width = MediaQuery.of(this).size.width.toInt();
 
     try {
-      final AdSize? adaptiveSize =
-          await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(width);
+      // Obtém o tamanho para dispositivos em modo paisagem
+      final AnchoredAdaptiveBannerAdSize? adaptiveSize =
+      await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(width);
 
       if (adaptiveSize != null) {
         return adaptiveSize;
@@ -66,5 +68,22 @@ extension AdSizeExtension on BuildContext {
   AdSize getStandardBannerAdSize() {
     // Para banners normais, usamos o tamanho padrão
     return AdSize.banner;
+  }
+
+  /// Método seguro para obter tamanho de anúncio adaptativo que verifica contexto
+  static Future<AdSize> getSafeAdaptiveBannerSize(BuildContext? context) async {
+    if (context == null || !context.mounted) {
+      return AdSize.banner;
+    }
+
+    try {
+      final width = MediaQuery.of(context).size.width.toInt();
+      final AnchoredAdaptiveBannerAdSize? adaptiveSize =
+      await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(width);
+      return adaptiveSize ?? AdSize.banner;
+    } catch (e) {
+      debugPrint('Erro ao obter tamanho adaptativo seguro: $e');
+      return AdSize.banner;
+    }
   }
 }

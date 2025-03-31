@@ -31,6 +31,13 @@ class _RewardedAdButtonState extends State<RewardedAdButton> {
   @override
   void initState() {
     super.initState();
+    _initAdManager();
+  }
+
+  Future<void> _initAdManager() async {
+    if (!_adManager.isInitialized) {
+      await _adManager.initialize();
+    }
     _checkAdStatus();
   }
 
@@ -39,15 +46,17 @@ class _RewardedAdButtonState extends State<RewardedAdButton> {
       setState(() {
         _isAdReady = _adManager.isRewardedAdReady;
       });
-    }
 
-    // Verifica novamente após um atraso se o anúncio não estiver pronto
-    if (!_isAdReady) {
-      Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) {
-          _checkAdStatus();
-        }
-      });
+      debugPrint('RewardedAdButton: Anúncio recompensado está pronto? $_isAdReady');
+
+      // Verifica novamente após um atraso se o anúncio não estiver pronto
+      if (!_isAdReady) {
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) {
+            _checkAdStatus();
+          }
+        });
+      }
     }
   }
 
@@ -66,6 +75,7 @@ class _RewardedAdButtonState extends State<RewardedAdButton> {
       _isLoading = true;
     });
 
+    debugPrint('RewardedAdButton: Tentando exibir anúncio recompensado');
     final bool rewardEarned = await _adManager.showRewardedAd();
 
     if (mounted) {
@@ -75,6 +85,7 @@ class _RewardedAdButtonState extends State<RewardedAdButton> {
       });
 
       if (rewardEarned) {
+        debugPrint('RewardedAdButton: Recompensa concedida, chamando callback');
         widget.onRewarded();
 
         // Exibe uma mensagem de sucesso
@@ -85,6 +96,8 @@ class _RewardedAdButtonState extends State<RewardedAdButton> {
             behavior: SnackBarBehavior.floating,
           ),
         );
+      } else {
+        debugPrint('RewardedAdButton: Recompensa não concedida');
       }
     }
 

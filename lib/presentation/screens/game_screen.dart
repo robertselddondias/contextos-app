@@ -1,3 +1,6 @@
+import 'dart:math' as math;
+import 'dart:math';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:contextual/core/constants/color_constants.dart';
 import 'package:contextual/domain/entities/guess.dart';
@@ -15,8 +18,6 @@ import 'package:contextual/utils/responsive_utils.dart';
 import 'package:contextual/utils/share_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'dart:math';
-import 'dart:math' as math;
 
 class GameScreen extends StatefulWidget {
   const GameScreen({super.key});
@@ -107,13 +108,11 @@ class _GameScreenState extends State<GameScreen> {
                 ? state
                 : (state as GameLoading).previousState as GameLoaded;
 
-            // Use SafeArea para garantir que o conteúdo está dentro da área segura da tela
             return SafeArea(
               child: Column(
                 children: [
                   // Banner de anúncio no topo
-                  if (!gameState.isCompleted)
-                    const AdBannerWidget(isTop: true),
+                  const AdBannerWidget(isTop: true),
 
                   // Cabeçalho com informações do jogo
                   GameHeader(
