@@ -25,7 +25,7 @@ class AdManager {
   bool get isPremium => _isPremium;
 
   // Test mode flag (for development)
-  final bool _useTestAds = kDebugMode;
+  final bool _useTestAds = false;
 
   // Ad instances
   BannerAd? _bannerAd;
@@ -44,9 +44,9 @@ class AdManager {
   int _interstitialFrequency = 3; // Show after every X game completions
 
   // Test ad unit IDs
-  static const String _testBannerAdUnitId = 'ca-app-pub-3940256099942544/6300978111';
-  static const String _testInterstitialAdUnitId = 'ca-app-pub-3940256099942544/1033173712';
-  static const String _testRewardedAdUnitId = 'ca-app-pub-3940256099942544/5224354917';
+  static const String _testBannerAdUnitId = 'ca-app-pub-4458700759850229/6473230385';
+  static const String _testInterstitialAdUnitId = 'ca-app-pub-4458700759850229/5755178538';
+  static const String _testRewardedAdUnitId = 'ca-app-pub-4458700759850229/2533985374';
 
   // Production ad unit IDs
   // Replace these with your actual production ad unit IDs

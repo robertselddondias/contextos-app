@@ -9,6 +9,7 @@ import 'package:contextual/presentation/widgets/guess_list.dart';
 import 'package:contextual/presentation/widgets/loading_indicator.dart';
 import 'package:contextual/presentation/widgets/rewarded_ad_button.dart';
 import 'package:contextual/presentation/widgets/success_dialog.dart';
+import 'package:contextual/presentation/widgets/word_changed_dialog.dart';
 import 'package:contextual/services/ad_manager.dart';
 import 'package:contextual/utils/responsive_utils.dart';
 import 'package:contextual/utils/share_helper.dart';
@@ -85,6 +86,10 @@ class _GameScreenState extends State<GameScreen> {
 
             // Mostrar anúncio intersticial quando o jogo for completado
             _adManager.notifyGameCompleted();
+          }
+
+          if (state is GameLoaded && state.showNewWordDialog) {
+            _showNewWordDialog(context);
           }
         },
         builder: (context, state) {
@@ -294,6 +299,30 @@ class _GameScreenState extends State<GameScreen> {
         },
       ),
     );
+  }
+
+  void _showNewWordDialog(BuildContext context) {
+    // Limpar a flag para não mostrar o diálogo novamente
+    final gameBloc = context.read<GameBloc>();
+
+    // Mostrar o diálogo depois de um breve atraso para garantir que a interface foi carregada
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false, // Não permite fechar clicando fora
+          builder: (context) => NewWordDialog(
+            onContinue: () {
+              // Fechar o diálogo
+              Navigator.of(context).pop();
+
+              // Limpar a flag no bloc
+              gameBloc.clearNewWordDialogFlag();
+            },
+          ),
+        );
+      }
+    });
   }
 
   void _showErrorSnackBar(BuildContext context, String message) {

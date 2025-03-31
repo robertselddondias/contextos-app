@@ -49,12 +49,24 @@ class GameBloc extends Bloc<GameEvent, GameState> {
     on<GameReset>(_onGameReset);
     on<GameShared>(_onGameShared);
     on<GameRefreshDaily>(_onGameRefreshDaily);
+    on<NewWordDetected>(_onNewWordDetected);
 
-    // Configura o listener de palavra diária
     _setupDailyWordListener();
   }
 
-  // Configura listener para mudanças na palavra diária
+  Future<void> _onNewWordDetected(
+      NewWordDetected event,
+      Emitter<GameState> emit,
+      ) async {
+    if (state is GameLoaded) {
+      final currentState = state as GameLoaded;
+
+      emit(currentState.copyWith(
+        showNewWordDialog: true,
+      ));
+    }
+  }
+
   void _setupDailyWordListener() {
     final today = DateTime.now();
     final dateStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
@@ -77,6 +89,12 @@ class GameBloc extends Bloc<GameEvent, GameState> {
           // Só reseta se a palavra for COMPLETAMENTE diferente
           if (firestoreWord.toLowerCase() != currentState.targetWord.toLowerCase()) {
             print('Nova palavra detectada no Firestore: $firestoreWord');
+
+            // Adicionar este evento para mostrar o diálogo
+            add(NewWordDetected(
+              oldWord: currentState.targetWord,
+              newWord: firestoreWord,
+            ));
 
             add(const GameReset(preserveGuesses: true));
           }
@@ -290,12 +308,22 @@ class GameBloc extends Bloc<GameEvent, GameState> {
           isCompleted: false,
           bestScore: newGameState.bestScore,
           dailyWordId: newGameState.dailyWordId,
+          showNewWordDialog: false,
         ));
       } else {
         emit(const GameError(message: 'Não foi possível reiniciar o jogo'));
       }
     } catch (e) {
       emit(GameError(message: e.toString()));
+    }
+  }
+
+  void clearNewWordDialogFlag() {
+    if (state is GameLoaded) {
+      final currentState = state as GameLoaded;
+      if (currentState.showNewWordDialog) {
+        emit(currentState.copyWith(showNewWordDialog: false));
+      }
     }
   }
 

@@ -27,6 +27,7 @@ class GameLoaded extends GameState {
   final bool isCompleted;
   final int bestScore;
   final String dailyWordId;
+  final bool showNewWordDialog; // Nova propriedade
 
   const GameLoaded({
     required this.targetWord,
@@ -34,6 +35,7 @@ class GameLoaded extends GameState {
     required this.isCompleted,
     required this.bestScore,
     required this.dailyWordId,
+    this.showNewWordDialog = false, // Valor padrão
   });
 
   @override
@@ -43,6 +45,7 @@ class GameLoaded extends GameState {
     isCompleted,
     bestScore,
     dailyWordId,
+    showNewWordDialog, // Adicionar aos props
   ];
 
   GameLoaded copyWith({
@@ -51,6 +54,7 @@ class GameLoaded extends GameState {
     bool? isCompleted,
     int? bestScore,
     String? dailyWordId,
+    bool? showNewWordDialog, // Adicionar ao copyWith
   }) {
     return GameLoaded(
       targetWord: targetWord ?? this.targetWord,
@@ -58,6 +62,7 @@ class GameLoaded extends GameState {
       isCompleted: isCompleted ?? this.isCompleted,
       bestScore: bestScore ?? this.bestScore,
       dailyWordId: dailyWordId ?? this.dailyWordId,
+      showNewWordDialog: showNewWordDialog ?? this.showNewWordDialog, // Usar no copyWith
     );
   }
 }

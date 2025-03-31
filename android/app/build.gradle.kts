@@ -37,22 +37,22 @@ android {
     }
 
     signingConfigs {
-        release {
-            storeFile file('release-key.jks')
-            storePassword '@@22anakin31'
-            keyAlias 'chave_release'
-            keyPassword '@@22anakin31'
+        create("release") {
+            storeFile = file("release-key.jks")
+            storePassword = "@@22anakin31"
+            keyAlias = "chave_release"
+            keyPassword = "@@22anakin31"
         }
     }
 
     buildTypes {
-        release {
-            signingConfig signingConfigs.release
-                    minifyEnabled true
-            shrinkResources true
+        getByName("release") {
+            signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = true
+            isShrinkResources = true
         }
-        debug {
-            signingConfig signingConfigs.debug
+        getByName("debug") {
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 }

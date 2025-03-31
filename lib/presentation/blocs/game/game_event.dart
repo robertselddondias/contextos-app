@@ -39,3 +39,16 @@ class GameRefreshDaily extends GameEvent {
   const GameRefreshDaily();
 }
 
+class NewWordDetected extends GameEvent {
+  final String oldWord;
+  final String newWord;
+
+  const NewWordDetected({
+    required this.oldWord,
+    required this.newWord,
+  });
+
+  @override
+  List<Object> get props => [oldWord, newWord];
+}
+

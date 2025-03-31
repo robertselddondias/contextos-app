@@ -1,7 +1,8 @@
 name: contextual
 description: Um jogo de adivinhação de palavras baseado em proximidade semântica.
 publish_to: 'none'
-version: 1.0.2+1
+#version: 1.0.2+1 IOS
+version: 1.0.0+1
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -11,28 +12,28 @@ dependencies:
   flutter:
     sdk: flutter
   # UI
-  cupertino_icons: ^1.0.6
-  google_fonts: ^6.1.0
-  animated_text_kit: ^4.2.2
-  lottie: ^2.7.0
-  flutter_svg: ^2.0.9
+  cupertino_icons: ^1.0.8
+  google_fonts: ^6.2.1
+  animated_text_kit: ^4.2.3
+  lottie: ^3.3.1
+  flutter_svg: ^2.0.17
 
-  games_services: ^3.0.0
+  games_services: ^4.1.0
 
-  package_info_plus: ^4.0.2
+  package_info_plus: ^8.3.0
 
-  in_app_purchase: ^3.1.13
+  in_app_purchase: ^3.2.1
 
-  timezone: ^0.9.2
+  timezone: ^0.10.0
 
   # Gerenciamento de Estado
-  flutter_bloc: ^8.1.3
-  equatable: ^2.0.5
-  get_it: ^7.6.4
+  flutter_bloc: ^9.1.0
+  equatable: ^2.0.7
+  get_it: ^8.0.3
   dartz: ^0.10.1
 
   # Armazenamento Local
-  shared_preferences: ^2.5.2
+  shared_preferences: ^2.5.3
   path_provider: ^2.1.5
 
   # Redes e APIs
@@ -45,8 +46,8 @@ dependencies:
 
   google_mobile_ads: ^5.3.1
 
-  smooth_page_indicator: ^1.1.0
-  confetti: ^0.7.0
+  smooth_page_indicator: ^1.2.1
+  confetti: ^0.8.0
 
   # Internacionalização
   intl: ^0.19.0
@@ -54,13 +55,13 @@ dependencies:
     sdk: flutter
 
   # Compartilhamento
-  share_plus: ^7.2.1
+  share_plus: ^10.1.4
 
   # Utilitários
-  collection: ^1.18.0
-  uuid: ^4.2.1
-  logger: ^2.0.2+1
-  url_launcher: ^6.2.2
+  collection: ^1.19.1
+  uuid: ^4.5.1
+  logger: ^2.5.0
+  url_launcher: ^6.3.1
 
   # Firebase
   firebase_core: ^3.12.1
@@ -76,11 +77,11 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.1
-  bloc_test: ^9.1.5
-  mockito: ^5.4.4
-  build_runner: ^2.4.7
-  json_serializable: ^6.7.0
+  flutter_lints: ^5.0.0
+  bloc_test: ^10.0.0
+  mockito: ^5.4.5
+  build_runner: ^2.4.15
+  json_serializable: ^6.9.4
 
 flutter:
   uses-material-design: true
