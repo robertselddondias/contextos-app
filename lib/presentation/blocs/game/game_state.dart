@@ -21,13 +21,16 @@ class GameLoading extends GameState {
   List<Object?> get props => [previousState];
 }
 
+// Modificação para a classe GameLoaded em game_state.dart
+
+// Atualização da classe GameLoaded para incluir a flag de nova palavra disponível
 class GameLoaded extends GameState {
   final String targetWord;
   final List<Guess> guesses;
   final bool isCompleted;
   final int bestScore;
   final String dailyWordId;
-  final bool showNewWordDialog; // Nova propriedade
+  final bool hasNewWordAvailable; // Nova flag
 
   const GameLoaded({
     required this.targetWord,
@@ -35,18 +38,19 @@ class GameLoaded extends GameState {
     required this.isCompleted,
     required this.bestScore,
     required this.dailyWordId,
-    this.showNewWordDialog = false, // Valor padrão
+    this.hasNewWordAvailable = false, // Opcional, com valor padrão falso
   });
 
   @override
-  List<Object?> get props => [
-    targetWord,
-    guesses,
-    isCompleted,
-    bestScore,
-    dailyWordId,
-    showNewWordDialog, // Adicionar aos props
-  ];
+  List<Object?> get props =>
+      [
+        targetWord,
+        guesses,
+        isCompleted,
+        bestScore,
+        dailyWordId,
+        hasNewWordAvailable,
+      ];
 
   GameLoaded copyWith({
     String? targetWord,
@@ -54,7 +58,7 @@ class GameLoaded extends GameState {
     bool? isCompleted,
     int? bestScore,
     String? dailyWordId,
-    bool? showNewWordDialog, // Adicionar ao copyWith
+    bool? hasNewWordAvailable,
   }) {
     return GameLoaded(
       targetWord: targetWord ?? this.targetWord,
@@ -62,7 +66,7 @@ class GameLoaded extends GameState {
       isCompleted: isCompleted ?? this.isCompleted,
       bestScore: bestScore ?? this.bestScore,
       dailyWordId: dailyWordId ?? this.dailyWordId,
-      showNewWordDialog: showNewWordDialog ?? this.showNewWordDialog, // Usar no copyWith
+      hasNewWordAvailable: hasNewWordAvailable ?? this.hasNewWordAvailable,
     );
   }
 }

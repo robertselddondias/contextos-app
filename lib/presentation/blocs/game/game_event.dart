@@ -52,3 +52,15 @@ class NewWordDetected extends GameEvent {
   List<Object> get props => [oldWord, newWord];
 }
 
+class DailyWordChanged extends GameEvent {
+  final String newWord;
+
+  const DailyWordChanged(this.newWord);
+
+  @override
+  List<Object> get props => [newWord];
+}
+class ClearNewWordDialogFlag extends GameEvent {
+  const ClearNewWordDialogFlag();
+}
+

@@ -1,10 +1,11 @@
-// lib/app.dart
+// Arquivo: lib/app.dart (modificado)
 import 'package:contextual/core/routes/app_routes.dart';
 import 'package:contextual/core/theme/app_theme.dart';
 import 'package:contextual/presentation/blocs/game/game_bloc.dart';
 import 'package:contextual/presentation/blocs/settings/settings_bloc.dart';
 import 'package:contextual/presentation/screens/onboarding_screen.dart';
 import 'package:contextual/presentation/screens/splash_screen.dart';
+import 'package:contextual/presentation/widgets/app_lifecycle_wrapper.dart';
 import 'package:contextual/presentation/widgets/premium_banner_wrapper.dart';
 import 'package:contextual/utils/keyboard_dismisser.dart';
 import 'package:flutter/material.dart';
@@ -29,65 +30,63 @@ class ContextoApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MultiBlocProvider(
-      providers: [
-        BlocProvider<GameBloc>(
-          create: (_) => GetIt.I<GameBloc>()..add(const GameInitialized()),
-        ),
-        BlocProvider<SettingsBloc>(
-          create: (_) => GetIt.I<SettingsBloc>()..add(const SettingsLoaded()),
-        ),
-      ],
-      child: BlocBuilder<SettingsBloc, SettingsState>(
-        buildWhen: (previous, current) =>
-        previous.themeMode != current.themeMode ||
-            previous.locale != current.locale,
-        builder: (context, state) {
-          // Envolva o MaterialApp com o AppKeyboardManager e PremiumBannerWrapper
-          return AppKeyboardManager(
-            child: MaterialApp(
-              title: 'Contexto',
-              debugShowCheckedModeBanner: false,
-              themeMode: state.themeMode,
-              theme: AppTheme.lightTheme,
-              darkTheme: AppTheme.darkTheme,
-              localizationsDelegates: const [
-                GlobalMaterialLocalizations.delegate,
-                GlobalWidgetsLocalizations.delegate,
-                GlobalCupertinoLocalizations.delegate,
-              ],
-              supportedLocales: const [
-                Locale('pt', 'BR'),
-                Locale('en', 'US'),
-                Locale('es', 'ES'),
-              ],
-              locale: state.locale,
-              routes: AppRoutes.routes,
-              home: PremiumBannerWrapper(
-                child: FutureBuilder<bool>(
-                  future: _shouldShowOnboarding(),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const SplashScreen();
-                    }
-
-                    final shouldShowOnboarding = snapshot.data ?? false;
-
-                    if (shouldShowOnboarding) {
-                      return const OnboardingScreen();
-                    } else {
-                      return const SplashScreen();
-                    }
-                  },
+    return PremiumBannerWrapper(
+      child: MultiBlocProvider(
+        providers: [
+          BlocProvider<GameBloc>(
+            create: (_) => GetIt.I<GameBloc>()..add(const GameInitialized()),
+          ),
+          BlocProvider<SettingsBloc>(
+            create: (_) => GetIt.I<SettingsBloc>()..add(const SettingsLoaded()),
+          ),
+        ],
+        child: BlocBuilder<SettingsBloc, SettingsState>(
+          buildWhen: (previous, current) =>
+          previous.themeMode != current.themeMode ||
+              previous.locale != current.locale,
+          builder: (context, state) {
+            // Envolve o MaterialApp com o AppLifecycleWrapper e o AppKeyboardManager
+            return AppLifecycleWrapper(
+              child: AppKeyboardManager(
+                child: MaterialApp(
+                  title: 'Contexto',
+                  debugShowCheckedModeBanner: false,
+                  themeMode: state.themeMode,
+                  theme: AppTheme.lightTheme,
+                  darkTheme: AppTheme.darkTheme,
+                  localizationsDelegates: const [
+                    GlobalMaterialLocalizations.delegate,
+                    GlobalWidgetsLocalizations.delegate,
+                    GlobalCupertinoLocalizations.delegate,
+                  ],
+                  supportedLocales: const [
+                    Locale('pt', 'BR'),
+                    Locale('en', 'US'),
+                    Locale('es', 'ES'),
+                  ],
+                  locale: state.locale,
+                  routes: AppRoutes.routes,
+                  home: FutureBuilder<bool>(
+                    future: _shouldShowOnboarding(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const SplashScreen();
+                      }
+      
+                      final shouldShowOnboarding = snapshot.data ?? false;
+      
+                      if (shouldShowOnboarding) {
+                        return const OnboardingScreen();
+                      } else {
+                        return const SplashScreen();
+                      }
+                    },
+                  ),
                 ),
               ),
-              builder: (context, child) {
-                // Envolve todas as rotas com o PremiumBannerWrapper
-                return PremiumBannerWrapper(child: child!);
-              },
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }

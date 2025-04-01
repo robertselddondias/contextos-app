@@ -1,6 +1,7 @@
 // Arquivo: lib/data/repositories/firebase_game_repository.dart
 // Modificar para buscar a palavra do dia do Firestore em vez de gerá-la localmente
 
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -22,7 +23,7 @@ class FirebaseGameRepository implements GameRepository {
   Future<Either<Failure, void>> saveGameState(GameStateModel gameState) async {
     try {
       // Salva o estado localmente
-      final jsonString = gameState.toRawJson();
+      final jsonString = json.encode(gameState.toJson());
       await _prefs.setString(AppConstants.prefsKeyGameState, jsonString);
 
       // Também salvamos a data do último jogo
@@ -60,7 +61,8 @@ class FirebaseGameRepository implements GameRepository {
       if (jsonString == null) return const Right(null);
 
       try {
-        final gameState = GameStateModel.fromRawJson(jsonString);
+        final Map<String, dynamic> jsonMap = json.decode(jsonString) as Map<String, dynamic>;
+        final gameState = GameStateModel.fromJson(jsonMap);
         return Right(gameState);
       } catch (e) {
         // Em caso de erro de parsing, retornamos null para começar um novo jogo
@@ -109,7 +111,8 @@ class FirebaseGameRepository implements GameRepository {
       );
 
       // Salvamos o estado atualizado
-      await _prefs.setString(AppConstants.prefsKeyGameState, updatedGameState.toRawJson());
+      final jsonString = json.encode(updatedGameState.toJson());
+      await _prefs.setString(AppConstants.prefsKeyGameState, jsonString);
 
       return Right(updatedGameState);
     } catch (e) {
@@ -177,7 +180,8 @@ class FirebaseGameRepository implements GameRepository {
       GameStateModel? savedGameState;
 
       if (savedGameStateJson != null) {
-        savedGameState = GameStateModel.fromRawJson(savedGameStateJson);
+        final Map<String, dynamic> jsonMap = json.decode(savedGameStateJson) as Map<String, dynamic>;
+        savedGameState = GameStateModel.fromJson(jsonMap);
       }
 
       // Obtemos a melhor pontuação
@@ -209,7 +213,7 @@ class FirebaseGameRepository implements GameRepository {
         );
 
         // Salva o novo estado
-        await _prefs.setString(AppConstants.prefsKeyGameState, newGameState.toRawJson());
+        await _prefs.setString(AppConstants.prefsKeyGameState, json.encode(newGameState.toJson()));
 
         return Right(newGameState);
       } else {
@@ -230,10 +234,12 @@ class FirebaseGameRepository implements GameRepository {
         return const Left(NotFoundFailure('Estado do jogo não encontrado'));
       }
 
-      final gameState = GameStateModel.fromRawJson(gameStateJson);
+      final Map<String, dynamic> jsonMap = json.decode(gameStateJson) as Map<String, dynamic>;
+      final gameState = GameStateModel.fromJson(jsonMap);
+
       final updatedGameState = gameState.copyWith(wasShared: true);
 
-      await _prefs.setString(AppConstants.prefsKeyGameState, updatedGameState.toRawJson());
+      await _prefs.setString(AppConstants.prefsKeyGameState, json.encode(updatedGameState.toJson()));
 
       // Registramos o compartilhamento no Firestore para analytics
       try {

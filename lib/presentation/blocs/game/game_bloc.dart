@@ -1,5 +1,6 @@
-// presentation/blocs/game/game_bloc.dart
+// presentation/blocs/game/game_bloc.dart (modificado para usar DailyWordListenerService)
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:bloc/bloc.dart';
@@ -13,7 +14,7 @@ import 'package:contextual/domain/repositories/word_repository.dart';
 import 'package:contextual/domain/usecases/get_daily_word.dart';
 import 'package:contextual/domain/usecases/make_guess.dart';
 import 'package:contextual/domain/usecases/save_game_state.dart';
-import 'package:contextual/services/premium_banner_service.dart';
+import 'package:contextual/services/daily_word_listener_service.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -30,7 +31,12 @@ class GameBloc extends Bloc<GameEvent, GameState> {
   final FirebaseFirestore _firestore;
   final SharedPreferences _prefs;
 
+  // Daily word listener service
+  final DailyWordListenerService _dailyWordListener = DailyWordListenerService();
+
+  // Subscriptions
   StreamSubscription? _dailyWordSubscription;
+  StreamSubscription? _wordUpdateSubscription;
 
   GameBloc({
     required this.getDailyWord,
@@ -50,24 +56,58 @@ class GameBloc extends Bloc<GameEvent, GameState> {
     on<GameReset>(_onGameReset);
     on<GameShared>(_onGameShared);
     on<GameRefreshDaily>(_onGameRefreshDaily);
-    on<NewWordDetected>(_onNewWordDetected);
+    on<DailyWordChanged>(_onDailyWordChanged);
+    on<ClearNewWordDialogFlag>(_onClearNewWordDialogFlag);
 
-    _setupDailyWordListener();
+    // Initialize the daily word listener
+    _initializeDailyWordListener();
   }
 
-  Future<void> _onNewWordDetected(
-      NewWordDetected event,
+  Future<void> _onClearNewWordDialogFlag(
+      ClearNewWordDialogFlag event,
       Emitter<GameState> emit,
       ) async {
+    // Verifica se o estado atual é GameLoaded
     if (state is GameLoaded) {
       final currentState = state as GameLoaded;
 
-      emit(currentState.copyWith(
-        showNewWordDialog: true,
-      ));
+      // Só emite um novo estado se a flag estiver ativa
+      if (currentState.hasNewWordAvailable) {
+        // Emite o mesmo estado, mas com a flag desativada
+        emit(currentState.copyWith(
+          hasNewWordAvailable: false,
+        ));
+
+        if (kDebugMode) {
+          print('GameBloc: Cleared new word dialog flag');
+        }
+      }
     }
   }
 
+  // Initialize the listener for daily word changes
+  Future<void> _initializeDailyWordListener() async {
+    try {
+      // Initialize the service
+      await _dailyWordListener.initialize();
+
+      // Listen for daily word updates
+      _wordUpdateSubscription = _dailyWordListener.dailyWordUpdates.listen((newWord) {
+        // When a new word is received, trigger an event to update the game
+        add(DailyWordChanged(newWord));
+      });
+
+      if (kDebugMode) {
+        print('GameBloc: Daily word listener initialized');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('GameBloc: Error initializing daily word listener: $e');
+      }
+    }
+  }
+
+  // Configura listener para mudanças na palavra diária (método legado)
   void _setupDailyWordListener() {
     final today = DateTime.now();
     final dateStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
@@ -89,53 +129,98 @@ class GameBloc extends Bloc<GameEvent, GameState> {
 
           // Só reseta se a palavra for COMPLETAMENTE diferente
           if (firestoreWord.toLowerCase() != currentState.targetWord.toLowerCase()) {
-            print('Nova palavra detectada no Firestore: $firestoreWord');
+            if (kDebugMode) {
+              print('Nova palavra detectada no Firestore: $firestoreWord');
+            }
 
-            // Adicionar este evento para mostrar o diálogo
-            add(NewWordDetected(
-              oldWord: currentState.targetWord,
-              newWord: firestoreWord,
-            ));
-
-            add(const GameReset(preserveGuesses: true));
+            // Use the new event to handle the change
+            add(DailyWordChanged(firestoreWord));
           }
         }
       }
     }, onError: (error) {
-      print('Erro no listener de palavra diária: $error');
+      if (kDebugMode) {
+        print('Erro no listener de palavra diária: $error');
+      }
     });
   }
 
-  // Busca uma palavra de dica relacionada
-  String _getHintWord(GameLoaded state) {
-    final contextService = FirebaseContextService();
-
+  Future<void> _onDailyWordChanged(
+      DailyWordChanged event,
+      Emitter<GameState> emit
+      ) async {
     try {
-      // Obtém as relações da palavra-alvo
-      final relations = contextService.getWordRelations(state.targetWord.toLowerCase());
+      if (kDebugMode) {
+        print('GameBloc: Processing daily word change to: ${event.newWord}');
+      }
 
-      // Se existem relações, retorna a primeira palavra com similaridade alta
-      final relatedWords = relations.entries
-          .where((entry) => entry.value > 0.6) // Apenas palavras com similaridade acima de 60%
-          .map((entry) => entry.key)
-          .toList();
+      // Get the current state
+      if (state is GameLoaded) {
+        final currentState = state as GameLoaded;
 
-      if (relatedWords.isNotEmpty) {
-        // Retorna uma palavra aleatória das relações
-        final random = Random();
-        return relatedWords[random.nextInt(relatedWords.length)];
+        // Only update if the word is different
+        if (event.newWord.toLowerCase() != currentState.targetWord.toLowerCase()) {
+          // Show loading state
+          emit(GameLoading(previousState: currentState));
+
+          // Check if the user has already completed the game for today
+          if (currentState.isCompleted) {
+            // Notify the user that a new word is available via the hasNewWordAvailable flag
+            if (kDebugMode) {
+              print('GameBloc: Game was completed, notifying user about new word');
+            }
+
+            // Emit the same state but with the hasNewWordAvailable flag set to true
+            emit(currentState.copyWith(
+              hasNewWordAvailable: true,
+            ));
+          } else {
+            // Game was not completed, so we can automatically update to the new word
+            if (kDebugMode) {
+              print('GameBloc: Game was not completed, automatically updating to new word');
+            }
+
+            // Get a fresh state with the new word
+            final today = DateTime.now();
+            final dailyWordId = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+
+            // Get best score
+            final bestScore = await _getBestScore();
+
+            // Create a new game state model
+            final newGameState = GameStateModel(
+              targetWord: event.newWord,
+              guesses: [], // Start fresh for a new word
+              isCompleted: false,
+              bestScore: bestScore,
+              dailyWordId: dailyWordId,
+              wasShared: false,
+            );
+
+            // Save to preferences using the repository
+            await _gameRepository.saveGameState(newGameState);
+
+            // Emit the new state
+            emit(GameLoaded(
+              targetWord: event.newWord,
+              guesses: [], // Start fresh for a new word
+              isCompleted: false,
+              bestScore: bestScore,
+              dailyWordId: dailyWordId,
+            ));
+          }
+        }
       }
     } catch (e) {
-      print('Erro ao obter palavra de dica: $e');
+      if (kDebugMode) {
+        print('GameBloc: Error processing daily word change: $e');
+      }
+
+      // If there was an error, keep the current state
+      if (state is GameLoaded) {
+        emit(state);
+      }
     }
-
-    // Fallback para dicas genéricas
-    final genericHints = [
-      'objeto', 'conceito', 'animal', 'lugar', 'ação',
-      'sentimento', 'natureza', 'tecnologia', 'pessoa',
-    ];
-
-    return genericHints[DateTime.now().microsecondsSinceEpoch % genericHints.length];
   }
 
   // Inicialização do jogo
@@ -146,6 +231,9 @@ class GameBloc extends Bloc<GameEvent, GameState> {
     emit(const GameLoading());
 
     try {
+      // Force check for latest word from Firestore
+      final latestWord = await _dailyWordListener.forceCheck();
+
       // Tenta carregar estado salvo
       final savedGameStateJson = _prefs.getString(AppConstants.prefsKeyGameState);
 
@@ -166,49 +254,57 @@ class GameBloc extends Bloc<GameEvent, GameState> {
         }
       }
 
-      try {
-        final premiumBannerService = PremiumBannerService();
-        await premiumBannerService.trackGameSession(gameCompleted: false);
-      } catch (e) {
-        // Ignorar erros do banner
-        debugPrint('Erro ao notificar banner premium sobre nova sessão: $e');
-      }
+      final jsonMap = json.decode(savedGameStateJson!) as Map<String, dynamic>;
+      final savedGameState = GameStateModel.fromJson(jsonMap);
 
-      // Carrega estado salvo
-      final savedGameState = GameStateModel.fromRawJson(savedGameStateJson!);
-
-      // Verifica palavra atual no Firestore
       final today = DateTime.now();
       final currentDateStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
 
-      try {
-        final dailyWordDoc = await _firestore.collection('daily_words').doc(currentDateStr).get();
-
-        if (dailyWordDoc.exists && dailyWordDoc.data()!.containsKey('word')) {
-          final firestoreWord = dailyWordDoc.data()!['word'] as String;
-
-          // Só reseta se a palavra for completamente diferente
-          if (firestoreWord.toLowerCase() != savedGameState.targetWord.toLowerCase()) {
-            final newGameState = await _fetchNewDailyWord();
-
-            if (newGameState != null) {
-              await _saveGameStateToPrefs(newGameState);
-              emit(GameLoaded(
-                targetWord: newGameState.targetWord,
-                guesses: savedGameState.guesses, // PRESERVA histórico de tentativas
-                isCompleted: false,
-                bestScore: savedGameState.bestScore,
-                dailyWordId: newGameState.dailyWordId,
-              ));
-              return;
-            }
-          }
+      // Check if we have a newer word from the initial check
+      if (latestWord != null && latestWord != savedGameState.targetWord &&
+          savedGameState.dailyWordId == currentDateStr) {
+        // We have a newer word for today
+        if (kDebugMode) {
+          print('GameBloc: Newer word available for today: $latestWord (saved: ${savedGameState.targetWord})');
         }
-      } catch (e) {
-        print('Erro ao verificar palavra do dia: $e');
+
+        // Create a new game state with the updated word
+        final updatedGameState = savedGameState.copyWith(
+          targetWord: latestWord,
+          isCompleted: false,
+        );
+
+        await _saveGameStateToPrefs(updatedGameState);
+
+        emit(GameLoaded(
+          targetWord: latestWord,
+          guesses: savedGameState.guesses,
+          isCompleted: false,
+          bestScore: savedGameState.bestScore,
+          dailyWordId: currentDateStr,
+        ));
+        return;
       }
 
-      // Se não houve mudança, emite o estado salvo
+      // Check if the saved game is for today
+      if (savedGameState.dailyWordId != currentDateStr) {
+        // Saved game is from a different day, get a new word
+        final newGameState = await _fetchNewDailyWord();
+
+        if (newGameState != null) {
+          await _saveGameStateToPrefs(newGameState);
+          emit(GameLoaded(
+            targetWord: newGameState.targetWord,
+            guesses: [], // Start with no guesses for a new day
+            isCompleted: false,
+            bestScore: newGameState.bestScore,
+            dailyWordId: newGameState.dailyWordId,
+          ));
+          return;
+        }
+      }
+
+      // If everything looks good, emit the saved state
       emit(GameLoaded(
         targetWord: savedGameState.targetWord,
         guesses: savedGameState.guesses,
@@ -260,19 +356,11 @@ class GameBloc extends Bloc<GameEvent, GameState> {
           ));
           emit(currentState);
         },
-            (gameState) async {
+            (gameState) {
           // Modifica a última tentativa se for uma dica
           final updatedGuesses = gameState.guesses.map((guess) {
             return event.isHint ? guess.copyWith(isHint: true) : guess;
           }).toList();
-          if (gameState.isCompleted && !currentState.isCompleted) {
-            try {
-              final premiumBannerService = PremiumBannerService();
-              await premiumBannerService.trackGameSession(gameCompleted: true);
-            } catch (e) {
-              debugPrint('Erro ao notificar banner premium sobre conclusão do jogo: $e');
-            }
-          }
 
           // Salva o novo estado
           _saveGameStateToPrefs(gameState.copyWith(guesses: updatedGuesses));
@@ -325,22 +413,12 @@ class GameBloc extends Bloc<GameEvent, GameState> {
           isCompleted: false,
           bestScore: newGameState.bestScore,
           dailyWordId: newGameState.dailyWordId,
-          showNewWordDialog: false,
         ));
       } else {
         emit(const GameError(message: 'Não foi possível reiniciar o jogo'));
       }
     } catch (e) {
       emit(GameError(message: e.toString()));
-    }
-  }
-
-  void clearNewWordDialogFlag() {
-    if (state is GameLoaded) {
-      final currentState = state as GameLoaded;
-      if (currentState.showNewWordDialog) {
-        emit(currentState.copyWith(showNewWordDialog: false));
-      }
     }
   }
 
@@ -355,15 +433,114 @@ class GameBloc extends Bloc<GameEvent, GameState> {
       await saveGameState(const SaveGameStateParams(wasShared: true));
     } catch (e) {
       // Ignora erros de salvamento
-      print('Erro ao marcar jogo como compartilhado: $e');
+      if (kDebugMode) {
+        print('Erro ao marcar jogo como compartilhado: $e');
+      }
     }
   }
 
-  // Atualização diária
   Future<void> _onGameRefreshDaily(
       GameRefreshDaily event,
-      Emitter<GameState> emit,
+      Emitter<GameState> emit
       ) async {
+    try {
+      // First, have the listener service check for date changes and force a refresh
+      await _dailyWordListener.checkForDateChange();
+      final latestWord = await _dailyWordListener.forceCheck();
+
+      // If no word was found, or if state is not loaded, continue with fallback logic
+      if (latestWord == null || state is! GameLoaded) {
+        // Fallback to the original logic
+        _fallbackDailyRefresh(emit);
+        return;
+      }
+
+      // If we got a word, compare with current state
+      final currentState = state as GameLoaded;
+
+      // Get the current date
+      final today = DateTime.now();
+      final currentDateStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+
+      // Check if date has changed
+      if (currentState.dailyWordId != currentDateStr) {
+        // Date has changed, create a new game for today
+        if (kDebugMode) {
+          print('GameBloc: Date changed from ${currentState.dailyWordId} to $currentDateStr, refreshing game');
+        }
+
+        // Create a new game state for today
+        final newGameState = GameStateModel(
+          targetWord: latestWord,
+          guesses: [], // Start fresh on a new day
+          isCompleted: false,
+          bestScore: currentState.bestScore,
+          dailyWordId: currentDateStr,
+          wasShared: false,
+        );
+
+        // Use the repository to save
+        await _gameRepository.saveGameState(newGameState);
+
+        emit(GameLoaded(
+          targetWord: latestWord,
+          guesses: [],
+          isCompleted: false,
+          bestScore: currentState.bestScore,
+          dailyWordId: currentDateStr,
+        ));
+      }
+      // Check if the word has changed or we have a new word flag set
+      else if (latestWord.toLowerCase() != currentState.targetWord.toLowerCase() || currentState.hasNewWordAvailable) {
+        // Word has changed but date is the same, or user is confirming they want to update to the new word
+        if (kDebugMode) {
+          print('GameBloc: Word changed from ${currentState.targetWord} to $latestWord for the same day');
+        }
+
+        // Update game state with new word
+        final updatedGameState = GameStateModel(
+          targetWord: latestWord,
+          guesses: [], // Start fresh for a new word
+          isCompleted: false,
+          bestScore: currentState.bestScore,
+          dailyWordId: currentDateStr,
+          wasShared: false,
+        );
+
+        // Use the repository to save
+        await _gameRepository.saveGameState(updatedGameState);
+
+        emit(GameLoaded(
+          targetWord: latestWord,
+          guesses: [],
+          isCompleted: false,
+          bestScore: currentState.bestScore,
+          dailyWordId: currentDateStr,
+          hasNewWordAvailable: false, // Reset the flag
+        ));
+      } else {
+        // Word is the same, no changes needed
+        if (kDebugMode) {
+          print('GameBloc: Daily refresh - no changes needed');
+        }
+
+        // Re-emit current state with hasNewWordAvailable reset to false
+        emit(currentState.copyWith(
+          hasNewWordAvailable: false,
+        ));
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('GameBloc: Error in daily refresh: $e');
+      }
+
+      // Try the fallback method if something went wrong
+      _fallbackDailyRefresh(emit);
+    }
+  }
+
+  // Original refresh method as fallback
+  void _fallbackDailyRefresh(Emitter<GameState> emit) async {
     try {
       // Obter a data atual no formato YYYY-MM-DD
       final today = DateTime.now();
@@ -561,6 +738,11 @@ class GameBloc extends Bloc<GameEvent, GameState> {
     }
   }
 
+  void clearNewWordDialogFlag() {
+    // Dispara o evento para limpar a flag
+    add(const ClearNewWordDialogFlag());
+  }
+
   Future<int> _getBestScore() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -573,7 +755,7 @@ class GameBloc extends Bloc<GameEvent, GameState> {
   Future<void> _saveGameStateToPrefs(GameStateModel gameState) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final jsonString = gameState.toRawJson();
+      final jsonString = json.encode(gameState.toJson());  // Usando json.encode em vez de toRawJson
       await prefs.setString('game_state', jsonString);
 
       // Salvamos também a data em que este estado foi salvo
@@ -597,7 +779,8 @@ class GameBloc extends Bloc<GameEvent, GameState> {
       final savedDate = prefs.getString('game_state_date');
 
       if (gameStateJson != null) {
-        final state = GameStateModel.fromRawJson(gameStateJson);
+        final jsonMap = json.decode(gameStateJson) as Map<String, dynamic>;  // Usando json.decode
+        final state = GameStateModel.fromJson(jsonMap);
 
         // Obter a data atual
         final today = DateTime.now();
@@ -660,10 +843,18 @@ class GameBloc extends Bloc<GameEvent, GameState> {
     return shareText;
   }
 
+  // Notifica quando o app volta ao primeiro plano
+  void onAppResume() {
+    // Usa o serviço de listener para verificar mudanças na palavra do dia
+    _dailyWordListener.onAppResume();
+  }
+
   // Fecha o bloc e cancela listeners
   @override
   Future<void> close() {
     _dailyWordSubscription?.cancel();
+    _wordUpdateSubscription?.cancel();
+    _dailyWordListener.dispose();
     return super.close();
   }
 }

@@ -159,51 +159,9 @@ class PremiumBannerService {
 
   /// Verifica se o banner deve ser mostrado com base nas configurações
   Future<void> _checkShouldShowBanner() async {
-    // Se o banner não está ativo nas configurações, não mostramos
-    if (_config['active'] != true) {
-      _shouldShowBanner = false;
-      _showBannerController.add(false);
-      return;
-    }
-
-    // Se o usuário já é premium, não mostramos o banner
-    if (_purchaseManager.removeAdsActive) {
-      _shouldShowBanner = false;
-      _showBannerController.add(false);
-      return;
-    }
-
-    final prefs = await SharedPreferences.getInstance();
-
-    // Verifica o número de exibições
-    final showCount = prefs.getInt(_prefKeyShowCount) ?? 0;
-    final maxShows = _config['max_shows_per_user'] ?? _defaultMaxShowsPerUser;
-
-    if (showCount >= maxShows) {
-      _shouldShowBanner = false;
-      _showBannerController.add(false);
-      return;
-    }
-
-    // Verifica o intervalo desde a última exibição
-    final lastShownStr = prefs.getString(_prefKeyLastShown);
-    final minIntervalHours = _config['min_interval_hours'] ?? _defaultMinIntervalHours;
-
-    if (lastShownStr != null) {
-      final lastShown = DateTime.parse(lastShownStr);
-      final now = DateTime.now();
-      final hoursSinceLastShown = now.difference(lastShown).inHours;
-
-      if (hoursSinceLastShown < minIntervalHours) {
-        _shouldShowBanner = false;
-        _showBannerController.add(false);
-        return;
-      }
-    }
-
-    // Se chegou até aqui, o banner pode ser mostrado
-    _shouldShowBanner = true;
-    _showBannerController.add(true);
+    // Use o novo método para verificar
+    _shouldShowBanner = await shouldShowBannerInMainScreen();
+    _showBannerController.add(_shouldShowBanner);
   }
 
   /// Registra que o banner foi mostrado
@@ -306,6 +264,52 @@ class PremiumBannerService {
       debugPrint('PremiumBannerService: Dados do banner resetados');
     } catch (e) {
       debugPrint('PremiumBannerService: Erro ao resetar dados do banner: $e');
+    }
+  }
+
+  Future<bool> shouldShowBannerInMainScreen() async {
+    if (!_isInitialized) {
+      await initialize();
+    }
+
+    // Se o banner não está ativo nas configurações ou o usuário é premium, não mostramos
+    if (_config['active'] != true || _purchaseManager.removeAdsActive) {
+      return false;
+    }
+
+    // Verifica outras condições como contagem de exibições e intervalo de tempo
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      // Verifica o número de exibições
+      final showCount = prefs.getInt(_prefKeyShowCount) ?? 0;
+      final maxShows = _config['max_shows_per_user'] ?? _defaultMaxShowsPerUser;
+
+      if (showCount >= maxShows) {
+        return false;
+      }
+
+      // Verifica o intervalo desde a última exibição
+      final lastShownStr = prefs.getString(_prefKeyLastShown);
+      final minIntervalHours = _config['min_interval_hours'] ?? _defaultMinIntervalHours;
+
+      if (lastShownStr != null) {
+        final lastShown = DateTime.parse(lastShownStr);
+        final now = DateTime.now();
+        final hoursSinceLastShown = now.difference(lastShown).inHours;
+
+        if (hoursSinceLastShown < minIntervalHours) {
+          return false;
+        }
+      }
+
+      // Se chegou até aqui, o banner pode ser mostrado
+      return true;
+    } catch (e) {
+      if (kDebugMode) {
+        print('PremiumBannerService: erro ao verificar condições para mostrar banner: $e');
+      }
+      return false;
     }
   }
 

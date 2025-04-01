@@ -1,5 +1,6 @@
-// core/di/dependency_injection.dart
+// core/di/dependency_injection.dart (modificado)
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:contextual/core/init/initialize_firestore.dart';
 import 'package:contextual/data/datasources/local/shared_prefs_manager.dart';
 import 'package:contextual/data/datasources/remote/firebase_context_service.dart';
 import 'package:contextual/data/datasources/remote/firebase_nlp_service.dart';
@@ -13,6 +14,7 @@ import 'package:contextual/domain/usecases/make_guess.dart';
 import 'package:contextual/domain/usecases/save_game_state.dart';
 import 'package:contextual/presentation/blocs/game/game_bloc.dart';
 import 'package:contextual/presentation/blocs/settings/settings_bloc.dart';
+import 'package:contextual/services/daily_word_listener_service.dart';
 import 'package:contextual/services/purchase_manager.dart';
 import 'package:contextual/services/smart_notification_service.dart';
 import 'package:contextual/services/user_activity_tracker.dart';
@@ -61,6 +63,11 @@ Future<void> initDependencies() async {
   getIt.registerLazySingleton<NlpService>(
         () => FirebaseNlpService(getIt<Dio>()),
   );
+
+  // Inicializa e registra o serviço de escuta da palavra diária
+  final dailyWordListenerService = DailyWordListenerService();
+  await dailyWordListenerService.initialize();
+  getIt.registerSingleton<DailyWordListenerService>(dailyWordListenerService);
 
   // Repositories
   getIt.registerLazySingleton<WordRepository>(

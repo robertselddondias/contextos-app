@@ -6,7 +6,7 @@ import 'package:contextual/utils/responsive_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// Widget de banner que promove a versão premium do app com design moderno e elegante
+/// Widget de banner que promove a versão premium do app
 class PremiumBannerWidget extends StatefulWidget {
   const PremiumBannerWidget({Key? key}) : super(key: key);
 
@@ -20,22 +20,20 @@ class _PremiumBannerWidgetState extends State<PremiumBannerWidget> with SingleTi
   late AnimationController _animationController;
   late Animation<double> _slideAnimation;
   late Animation<double> _fadeAnimation;
-  late Animation<double> _scaleAnimation;
+  bool _visible = false;
   bool _isPurchasing = false;
 
   @override
   void initState() {
     super.initState();
 
-    debugPrint('PremiumBannerWidget: Widget inicializado');
-
     // Configurar animações
     _animationController = AnimationController(
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 600),
       vsync: this,
     );
 
-    _slideAnimation = Tween<double>(begin: 150.0, end: 0.0).animate(
+    _slideAnimation = Tween<double>(begin: 100.0, end: 0.0).animate(
       CurvedAnimation(
         parent: _animationController,
         curve: Curves.easeOutBack,
@@ -49,17 +47,8 @@ class _PremiumBannerWidgetState extends State<PremiumBannerWidget> with SingleTi
       ),
     );
 
-    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: Curves.elasticOut,
-      ),
-    );
-
-    // Inicializar o banner
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initBanner();
-    });
+    // Inicializar e verificar se o banner deve ser mostrado
+    _initialize();
   }
 
   @override
@@ -68,30 +57,62 @@ class _PremiumBannerWidgetState extends State<PremiumBannerWidget> with SingleTi
     super.dispose();
   }
 
-  /// Inicializa o banner
-  Future<void> _initBanner() async {
-    try {
-      await _bannerService.initialize();
+  Future<void> _initialize() async {
+    // Garantir que o gerenciador de compras está inicializado
+    if (!_purchaseManager.isInitialized) {
       await _purchaseManager.initialize();
-
-      // Iniciar animação
-      _animationController.forward();
-
-      debugPrint('PremiumBannerWidget: Banner inicializado e animação iniciada');
-    } catch (e) {
-      debugPrint('PremiumBannerWidget: Erro ao inicializar banner: $e');
     }
+
+    // Garantir que o serviço de banner está inicializado
+    if (!_bannerService.isInitialized) {
+      await _bannerService.initialize();
+    }
+
+    // Verificar estado inicial
+    final shouldShow = await _bannerService.shouldShowBannerInMainScreen();
+    if (shouldShow && mounted) {
+      setState(() {
+        _visible = true;
+      });
+      _animationController.forward();
+    }
+
+    // Escutar mudanças no estado do banner
+    _bannerService.showBannerStream.listen((shouldShow) {
+      if (shouldShow && !_visible && mounted) {
+        setState(() {
+          _visible = true;
+        });
+        _animationController.forward();
+      } else if (!shouldShow && _visible && mounted) {
+        _animationController.reverse().then((_) {
+          if (mounted) {
+            setState(() {
+              _visible = false;
+            });
+          }
+        });
+      }
+    });
+
+    // Escutar mudanças nas compras para atualizar o estado
+    _purchaseManager.purchaseStateStream.listen((isPremium) {
+      if (isPremium && _visible && mounted) {
+        _animationController.reverse().then((_) {
+          if (mounted) {
+            setState(() {
+              _visible = false;
+            });
+          }
+        });
+      }
+    });
   }
 
   /// Fecha o banner e marca como exibido
   void _dismissBanner() {
     HapticFeedback.lightImpact();
     _bannerService.markBannerAsShown();
-
-    // Animar fechamento
-    _animationController.reverse();
-
-    debugPrint('PremiumBannerWidget: Banner dispensado pelo usuário');
   }
 
   /// Inicia o processo de compra
@@ -105,21 +126,10 @@ class _PremiumBannerWidgetState extends State<PremiumBannerWidget> with SingleTi
     });
 
     try {
-      debugPrint('PremiumBannerWidget: Iniciando processo de compra');
       await _purchaseManager.buyRemoveAds();
       // A compra é processada por listeners, não precisamos fazer nada
     } catch (e) {
-      debugPrint('PremiumBannerWidget: Erro no processo de compra: $e');
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Não foi possível iniciar a compra. Tente novamente mais tarde.'),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-      }
+      // Erro tratado pelo PurchaseManager
     } finally {
       if (mounted) {
         setState(() {
@@ -131,346 +141,269 @@ class _PremiumBannerWidgetState extends State<PremiumBannerWidget> with SingleTi
 
   @override
   Widget build(BuildContext context) {
-    // Obtém as mensagens do banner
-    final messages = _bannerService.getBannerMessages();
-    final primaryMessage = messages['primary'] ?? 'Remova os anúncios';
-    final secondaryMessage = messages['secondary'] ?? 'Jogue sem interrupções';
+    // Verificar se deve exibir o banner
+    return FutureBuilder<bool>(
+      future: _bannerService.shouldShowBannerInMainScreen(),
+      initialData: false, // Inicialmente não mostra
+      builder: (context, snapshot) {
+        final shouldShow = snapshot.data ?? false;
 
-    // Detecta tema escuro
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+        // Se não deve mostrar, retorna um widget vazio
+        if (!shouldShow || !_visible) {
+          return const SizedBox.shrink();
+        }
 
-    // Cores do tema moderno
-    final Color primaryGradientStart = isDarkMode
-        ? const Color(0xFF2B2D5D)
-        : const Color(0xFF6366F1);
-    final Color primaryGradientEnd = isDarkMode
-        ? const Color(0xFF1A1F38)
-        : const Color(0xFF4F46E5);
-    final Color accentColor = isDarkMode
-        ? const Color(0xFF9FA0FF)
-        : const Color(0xFFEEF2FF);
-    final Color buttonColor = isDarkMode
-        ? const Color(0xFFEEF2FF)
-        : Colors.white;
-    final Color buttonTextColor = isDarkMode
-        ? const Color(0xFF2B2D5D)
-        : const Color(0xFF4338CA);
+        // Detectar tema escuro
+        final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
-    return AnimatedBuilder(
-      animation: _animationController,
-      builder: (context, child) {
-        return Transform.translate(
-          offset: Offset(0, _slideAnimation.value),
-          child: Opacity(
-            opacity: _fadeAnimation.value,
-            child: Transform.scale(
-              scale: _scaleAnimation.value,
-              child: Container(
-                margin: EdgeInsets.symmetric(
-                  horizontal: context.responsiveValue(
-                    small: 16.0,
-                    medium: 20.0,
-                    large: 24.0,
-                  ),
-                  vertical: context.responsiveValue(
-                    small: 10.0,
-                    medium: 12.0,
-                    large: 16.0,
-                  ),
-                ),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      primaryGradientStart,
-                      primaryGradientEnd,
+        // Se deve mostrar, exibe o banner
+        return AnimatedBuilder(
+          animation: _animationController,
+          builder: (context, child) {
+            return Transform.translate(
+              offset: Offset(0, _slideAnimation.value),
+              child: Opacity(
+                opacity: _fadeAnimation.value,
+                child: Container(
+                  margin: EdgeInsets.all(context.responsiveValue(
+                    small: 12.0,
+                    medium: 16.0,
+                    large: 20.0,
+                  )),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: isDarkMode
+                          ? [
+                        Color(0xFF2A2A72),
+                        Color(0xFF003366),
+                      ]
+                          : [
+                        Color(0xFF7F5AF0),
+                        Color(0xFF4E35DD),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: isDarkMode
+                            ? Colors.black.withOpacity(0.3)
+                            : Colors.black.withOpacity(0.2),
+                        blurRadius: 10,
+                        offset: const Offset(0, 5),
+                      ),
                     ],
                   ),
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: primaryGradientStart.withOpacity(0.3),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
-                      spreadRadius: 1,
-                    ),
-                  ],
-                  border: Border.all(
-                    color: accentColor.withOpacity(0.3),
-                    width: 1.5,
-                  ),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(24),
-                  child: Stack(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Fundo decorativo com círculos
-                      Positioned(
-                        top: -20,
-                        right: -20,
-                        child: Container(
-                          width: 100,
-                          height: 100,
-                          decoration: BoxDecoration(
-                            color: accentColor.withOpacity(0.1),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        bottom: -40,
-                        left: -20,
-                        child: Container(
-                          width: 150,
-                          height: 150,
-                          decoration: BoxDecoration(
-                            color: accentColor.withOpacity(0.08),
-                            shape: BoxShape.circle,
-                          ),
+                      // Cabeçalho com botão de fechar
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8.0, top: 8.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            IconButton(
+                              icon: const Icon(
+                                Icons.close,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                              onPressed: _dismissBanner,
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                minWidth: 24,
+                                minHeight: 24,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
 
-                      // Conteúdo do banner
-                      Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // Cabeçalho com badge premium e botão de fechar
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 16, 8, 0),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                // Badge premium
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: accentColor.withOpacity(0.2),
-                                    borderRadius: BorderRadius.circular(12),
+                      // Conteúdo principal
+                      Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: context.responsiveValue(
+                            small: 16.0,
+                            medium: 20.0,
+                            large: 24.0,
+                          ),
+                          vertical: context.responsiveValue(
+                            small: 8.0,
+                            medium: 12.0,
+                            large: 16.0,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            // Ícone animado
+                            Container(
+                              width: context.responsiveValue(
+                                small: 50.0,
+                                medium: 60.0,
+                                large: 70.0,
+                              ),
+                              height: context.responsiveValue(
+                                small: 50.0,
+                                medium: 60.0,
+                                large: 70.0,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.15),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.block,
+                                    color: Colors.white,
+                                    size: context.responsiveValue(
+                                      small: 24.0,
+                                      medium: 28.0,
+                                      large: 32.0,
+                                    ),
                                   ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.star_rounded,
-                                        color: Colors.amberAccent,
-                                        size: 16,
+                                  Positioned(
+                                    right: 10,
+                                    bottom: 10,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: const BoxDecoration(
+                                        color: Colors.white,
+                                        shape: BoxShape.circle,
                                       ),
-                                      SizedBox(width: 4),
-                                      Text(
-                                        'PREMIUM',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 12,
-                                          letterSpacing: 1,
+                                      child: Icon(
+                                        Icons.ads_click,
+                                        color: isDarkMode
+                                            ? Color(0xFF2A2A72)
+                                            : Color(0xFF7F5AF0),
+                                        size: context.responsiveValue(
+                                          small: 12.0,
+                                          medium: 14.0,
+                                          large: 16.0,
                                         ),
                                       ),
-                                    ],
-                                  ),
-                                ),
-
-                                // Botão de fechar
-                                IconButton(
-                                  icon: Container(
-                                    padding: const EdgeInsets.all(4),
-                                    decoration: BoxDecoration(
-                                      color: accentColor.withOpacity(0.2),
-                                      shape: BoxShape.circle,
                                     ),
-                                    child: const Icon(
-                                      Icons.close_rounded,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+
+                            // Texto
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _getBannerMessages()['primary']!,
+                                    style: TextStyle(
                                       color: Colors.white,
-                                      size: 16,
+                                      fontSize: context.responsiveFontSize(18),
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                  onPressed: _dismissBanner,
-                                  visualDensity: VisualDensity.compact,
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(
-                                    minWidth: 32,
-                                    minHeight: 32,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          // Conteúdo principal
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-                            child: Row(
-                              children: [
-                                // Ícone animado
-                                _buildPremiumIcon(context, accentColor),
-                                const SizedBox(width: 20),
-
-                                // Texto
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        primaryMessage,
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: context.responsiveFontSize(18),
-                                          fontWeight: FontWeight.bold,
-                                          letterSpacing: 0.5,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        secondaryMessage,
-                                        style: TextStyle(
-                                          color: Colors.white.withOpacity(0.9),
-                                          fontSize: context.responsiveFontSize(14),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          // Botão de ação com efeito de destaque
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                            child: SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton(
-                                onPressed: _isPurchasing ? null : _startPurchase,
-                                style: ElevatedButton.styleFrom(
-                                  foregroundColor: buttonTextColor,
-                                  backgroundColor: buttonColor,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 14,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  elevation: 0,
-                                  shadowColor: Colors.transparent,
-                                ),
-                                child: AnimatedSwitcher(
-                                  duration: const Duration(milliseconds: 300),
-                                  child: _isPurchasing
-                                      ? SizedBox(
-                                    key: const ValueKey('loading'),
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2.5,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        buttonTextColor,
-                                      ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    _getBannerMessages()['secondary']!,
+                                    style: TextStyle(
+                                      color: Colors.white.withOpacity(0.9),
+                                      fontSize: context.responsiveFontSize(14),
                                     ),
-                                  )
-                                      : Row(
-                                    key: const ValueKey('button'),
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        'Comprar agora',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: context.responsiveFontSize(15),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      const Icon(Icons.arrow_forward_rounded, size: 18),
-                                    ],
                                   ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Botão de ação
+                      Padding(
+                        padding: EdgeInsets.only(
+                          left: context.responsiveValue(
+                            small: 16.0,
+                            medium: 20.0,
+                            large: 24.0,
+                          ),
+                          right: context.responsiveValue(
+                            small: 16.0,
+                            medium: 20.0,
+                            large: 24.0,
+                          ),
+                          bottom: context.responsiveValue(
+                            small: 16.0,
+                            medium: 20.0,
+                            large: 24.0,
+                          ),
+                        ),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: _isPurchasing ? null : _startPurchase,
+                            style: ElevatedButton.styleFrom(
+                              foregroundColor: isDarkMode
+                                  ? Color(0xFF2A2A72)
+                                  : Color(0xFF7F5AF0),
+                              backgroundColor: Colors.white,
+                              padding: EdgeInsets.symmetric(
+                                vertical: context.responsiveValue(
+                                  small: 10.0,
+                                  medium: 12.0,
+                                  large: 14.0,
                                 ),
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: _isPurchasing
+                                ? SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.0,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  isDarkMode
+                                      ? Color(0xFF2A2A72)
+                                      : Color(0xFF7F5AF0),
+                                ),
+                              ),
+                            )
+                                : Text(
+                              'Comprar agora',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: context.responsiveFontSize(15),
                               ),
                             ),
                           ),
-                        ],
+                        ),
                       ),
                     ],
                   ),
                 ),
               ),
-            ),
-          ),
+            );
+          },
         );
       },
     );
   }
 
-  // Ícone premium com efeito visual moderno
-  Widget _buildPremiumIcon(BuildContext context, Color accentColor) {
-    return Container(
-      width: context.responsiveValue(
-        small: 56.0,
-        medium: 64.0,
-        large: 72.0,
-      ),
-      height: context.responsiveValue(
-        small: 56.0,
-        medium: 64.0,
-        large: 72.0,
-      ),
-      decoration: BoxDecoration(
-        color: accentColor.withOpacity(0.15),
-        shape: BoxShape.circle,
-        border: Border.all(
-          color: accentColor.withOpacity(0.5),
-          width: 2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: accentColor.withOpacity(0.2),
-            blurRadius: 15,
-            spreadRadius: 1,
-          ),
-        ],
-      ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // Ícone principal
-          Icon(
-            Icons.block_flipped,
-            color: Colors.white,
-            size: context.responsiveValue(
-              small: 26.0,
-              medium: 30.0,
-              large: 34.0,
-            ),
-          ),
+  /// Obtém as mensagens para exibir no banner
+  Map<String, String> _getBannerMessages() {
+    // Busca mensagens do serviço
+    final messages = _bannerService.getBannerMessages();
 
-          // Elemento decorativo
-          Positioned(
-            right: 6,
-            bottom: 6,
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Icon(
-                Icons.verified_rounded,
-                color: Colors.blue,
-                size: context.responsiveValue(
-                  small: 12.0,
-                  medium: 14.0,
-                  large: 16.0,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+    // Fallback para mensagens padrão caso o serviço não retorne nada
+    return {
+      'primary': messages['primary'] ?? 'Remova os anúncios',
+      'secondary': messages['secondary'] ?? 'Jogue sem interrupções por apenas R\$19,90',
+    };
   }
 }

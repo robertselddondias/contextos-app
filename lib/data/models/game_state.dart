@@ -1,5 +1,4 @@
-// data/models/game_state.dart
-import 'dart:convert';
+// Modificações para o GameStateModel em data/models/game_state.dart
 
 import 'package:contextual/domain/entities/guess.dart';
 
@@ -10,6 +9,7 @@ class GameStateModel {
   final int bestScore;
   final String dailyWordId;
   final bool wasShared;
+  final bool hasNewWordAvailable; // Nova propriedade
 
   GameStateModel({
     required this.targetWord,
@@ -18,6 +18,7 @@ class GameStateModel {
     required this.bestScore,
     required this.dailyWordId,
     this.wasShared = false,
+    this.hasNewWordAvailable = false, // Valor padrão
   });
 
   GameStateModel copyWith({
@@ -27,6 +28,7 @@ class GameStateModel {
     int? bestScore,
     String? dailyWordId,
     bool? wasShared,
+    bool? hasNewWordAvailable,
   }) {
     return GameStateModel(
       targetWord: targetWord ?? this.targetWord,
@@ -35,6 +37,7 @@ class GameStateModel {
       bestScore: bestScore ?? this.bestScore,
       dailyWordId: dailyWordId ?? this.dailyWordId,
       wasShared: wasShared ?? this.wasShared,
+      hasNewWordAvailable: hasNewWordAvailable ?? this.hasNewWordAvailable,
     );
   }
 
@@ -46,6 +49,7 @@ class GameStateModel {
       'bestScore': bestScore,
       'dailyWordId': dailyWordId,
       'wasShared': wasShared,
+      'hasNewWordAvailable': hasNewWordAvailable,
     };
   }
 
@@ -59,11 +63,7 @@ class GameStateModel {
       bestScore: json['bestScore'] as int,
       dailyWordId: json['dailyWordId'] as String,
       wasShared: json['wasShared'] as bool? ?? false,
+      hasNewWordAvailable: json['hasNewWordAvailable'] as bool? ?? false,
     );
   }
-
-  String toRawJson() => json.encode(toJson());
-
-  factory GameStateModel.fromRawJson(String source) =>
-      GameStateModel.fromJson(json.decode(source) as Map<String, dynamic>);
 }

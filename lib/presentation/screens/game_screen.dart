@@ -10,6 +10,7 @@ import 'package:contextual/presentation/widgets/game_header.dart';
 import 'package:contextual/presentation/widgets/guess_input.dart';
 import 'package:contextual/presentation/widgets/guess_list.dart';
 import 'package:contextual/presentation/widgets/loading_indicator.dart';
+import 'package:contextual/presentation/widgets/new_word_notification.dart';
 import 'package:contextual/presentation/widgets/rewarded_ad_button.dart';
 import 'package:contextual/presentation/widgets/success_dialog.dart';
 import 'package:contextual/presentation/widgets/word_changed_dialog.dart';
@@ -80,16 +81,19 @@ class _GameScreenState extends State<GameScreen> {
             _showErrorSnackBar(context, state.message);
           }
 
-          if (state is GameLoaded && state.isCompleted &&
-              !_hasShownSuccessDialog) {
-            _showSuccessDialog(context, state);
-            _hasShownSuccessDialog = true;
+          if (state is GameLoaded) {
+            _checkForNewWord(context, state);
 
-            // Mostrar anúncio intersticial quando o jogo for completado
-            _adManager.notifyGameCompleted();
+            if (state.isCompleted && !_hasShownSuccessDialog) {
+              _showSuccessDialog(context, state);
+              _hasShownSuccessDialog = true;
+
+              // Mostrar anúncio intersticial quando o jogo for completado
+              _adManager.notifyGameCompleted();
+            }
           }
 
-          if (state is GameLoaded && state.showNewWordDialog) {
+          if (state is GameLoaded && state.hasNewWordAvailable) {
             _showNewWordDialog(context);
           }
         },
@@ -443,6 +447,31 @@ class _GameScreenState extends State<GameScreen> {
             ),
       );
     });
+  }
+
+  void _checkForNewWord(BuildContext context, GameLoaded state) {
+    // Verifica se o GameBloc tem uma notificação de nova palavra
+    if (state.hasNewWordAvailable == true) {
+      // Mostra um diálogo informando sobre a nova palavra
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          contentPadding: EdgeInsets.zero,
+          content: NewWordNotification(
+            onRefresh: () {
+              // Atualiza o jogo com a nova palavra
+              context.read<GameBloc>().add(const GameRefreshDaily());
+            },
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+        ),
+      );
+    }
   }
 
   void _shareResults(BuildContext context, GameLoaded state) {
