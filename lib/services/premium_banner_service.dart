@@ -118,11 +118,10 @@ class PremiumBannerService {
     try {
       final docSnapshot = await _firestore
           .collection(_configCollection)
-          .doc(_bannerConfigDoc)
-          .get();
+          .where("active", isEqualTo: true).get();
 
-      if (docSnapshot.exists) {
-        _config = docSnapshot.data() ?? {};
+      if (docSnapshot.docs.isNotEmpty) {
+        _config = (docSnapshot.docs.first.data() as Map<String, dynamic>) ?? {};
 
         if (kDebugMode) {
           debugPrint('Configurações do banner premium carregadas do Firebase');
@@ -268,7 +267,7 @@ class PremiumBannerService {
   }
 
   Future<bool> shouldShowBannerInMainScreen() async {
-    if (!_isInitialized) {
+    if (_isInitialized) {
       await initialize();
     }
 

@@ -25,7 +25,7 @@ class AdManager {
   bool get isPremium => _isPremium;
 
   // Flag de modo de teste (para desenvolvimento)
-  final bool _useTestAds = false;
+  final bool _useTestAds = kDebugMode;
 
   // Instâncias de anúncios
   BannerAd? _bannerAd;

@@ -1,6 +1,3 @@
-import 'dart:math' as math;
-import 'dart:math';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:contextual/core/constants/color_constants.dart';
 import 'package:contextual/domain/entities/guess.dart';
@@ -10,15 +7,15 @@ import 'package:contextual/presentation/widgets/game_header.dart';
 import 'package:contextual/presentation/widgets/guess_input.dart';
 import 'package:contextual/presentation/widgets/guess_list.dart';
 import 'package:contextual/presentation/widgets/loading_indicator.dart';
-import 'package:contextual/presentation/widgets/new_word_notification.dart';
 import 'package:contextual/presentation/widgets/rewarded_ad_button.dart';
 import 'package:contextual/presentation/widgets/success_dialog.dart';
-import 'package:contextual/presentation/widgets/word_changed_dialog.dart';
 import 'package:contextual/services/ad_manager.dart';
 import 'package:contextual/utils/responsive_utils.dart';
 import 'package:contextual/utils/share_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'dart:math';
+import 'dart:math' as math;
 
 class GameScreen extends StatefulWidget {
   const GameScreen({super.key});
@@ -47,6 +44,84 @@ class _GameScreenState extends State<GameScreen> {
     _guessController.dispose();
     _adManager.dispose();
     super.dispose();
+  }
+
+  // Método auxiliar para obter uma dica para o anúncio recompensado
+  Future<String?> _getAvailableHintWord(GameLoaded state) async {
+    try {
+      // Referência ao Firestore
+      final firestore = FirebaseFirestore.instance;
+
+      // Busca a palavra na coleção de words para obter suas relações
+      final wordDoc = await firestore.collection('words').doc(
+          state.targetWord.toLowerCase()).get();
+
+      if (wordDoc.exists && wordDoc.data() != null &&
+          wordDoc.data()!.containsKey('relations')) {
+        // Obtém as relações da palavra alvo
+        final relations = wordDoc.data()!['relations'] as Map<String, dynamic>;
+
+        if (relations.isNotEmpty) {
+          // Converte para uma lista de entradas (palavra, similaridade)
+          final relationsList = relations.entries.toList();
+
+          // Ordena pela similaridade (do maior para o menor)
+          relationsList.sort((a, b) =>
+              (b.value as num).compareTo(a.value as num));
+
+          // Filtra para não retornar palavras que o usuário já tentou
+          final usedWords = state.guesses
+              .map((g) => g.word.toLowerCase())
+              .toSet();
+          final availableHints = relationsList.where((entry) =>
+          !usedWords.contains(entry.key) && (entry.value as num) > 0.6)
+              .toList();
+
+          // Se temos dicas disponíveis, retorna uma aleatoriamente entre as top 3
+          if (availableHints.isNotEmpty) {
+            final random = Random();
+            final topIndex = random.nextInt(math.min(3, availableHints.length));
+            return availableHints[topIndex].key;
+          }
+        }
+      }
+
+      // Fallback para o método antigo se não conseguir encontrar uma relação
+      // Ordena as tentativas por similaridade (da maior para a menor)
+      if (state.guesses.isEmpty) {
+        return null;
+      }
+
+      final sortedGuesses = List<Guess>.from(state.guesses)
+        ..sort((a, b) => b.similarity.compareTo(a.similarity));
+
+      // Retorna a palavra mais próxima como dica
+      if (sortedGuesses.isNotEmpty && sortedGuesses.first.similarity > 0.5) {
+        return sortedGuesses.first.word;
+      }
+
+      // Lista de palavras relacionadas genéricas caso não tenha uma boa dica
+      final genericHints = [
+        'objeto', 'conceito', 'animal', 'lugar', 'ação',
+        'sentimento', 'natureza', 'tecnologia', 'pessoa',
+      ];
+
+      // Retorna uma dica genérica
+      final genericHint = genericHints[DateTime
+          .now()
+          .microsecond % genericHints.length];
+
+      // Verifica se a dica genérica já foi tentada
+      if (state.guesses.any((g) => g.word.toLowerCase() == genericHint)) {
+        return null;
+      }
+
+      return genericHint;
+    } catch (e) {
+      print('Erro ao buscar dica: $e');
+      // Retorna null em caso de erro
+      return null;
+    }
   }
 
   @override
@@ -81,20 +156,13 @@ class _GameScreenState extends State<GameScreen> {
             _showErrorSnackBar(context, state.message);
           }
 
-          if (state is GameLoaded) {
-            _checkForNewWord(context, state);
+          if (state is GameLoaded && state.isCompleted &&
+              !_hasShownSuccessDialog) {
+            _showSuccessDialog(context, state);
+            _hasShownSuccessDialog = true;
 
-            if (state.isCompleted && !_hasShownSuccessDialog) {
-              _showSuccessDialog(context, state);
-              _hasShownSuccessDialog = true;
-
-              // Mostrar anúncio intersticial quando o jogo for completado
-              _adManager.notifyGameCompleted();
-            }
-          }
-
-          if (state is GameLoaded && state.hasNewWordAvailable) {
-            _showNewWordDialog(context);
+            // Mostrar anúncio intersticial quando o jogo for completado
+            _adManager.notifyGameCompleted();
           }
         },
         builder: (context, state) {
@@ -112,11 +180,13 @@ class _GameScreenState extends State<GameScreen> {
                 ? state
                 : (state as GameLoading).previousState as GameLoaded;
 
+            // Use SafeArea para garantir que o conteúdo está dentro da área segura da tela
             return SafeArea(
               child: Column(
                 children: [
                   // Banner de anúncio no topo
-                  const AdBannerWidget(isTop: true),
+                  if (!gameState.isCompleted)
+                    const AdBannerWidget(isTop: true),
 
                   // Cabeçalho com informações do jogo
                   GameHeader(
@@ -137,13 +207,9 @@ class _GameScreenState extends State<GameScreen> {
                   ),
 
                   // Container para botões e input com altura mínima
-                  // Usando uma altura máxima para garantir espaço suficiente
                   Container(
                     constraints: BoxConstraints(
-                      maxHeight: MediaQuery
-                          .of(context)
-                          .size
-                          .height * 0.25,
+                      maxHeight: MediaQuery.of(context).size.height * 0.25,
                     ),
                     child: SingleChildScrollView(
                       physics: const BouncingScrollPhysics(),
@@ -151,45 +217,54 @@ class _GameScreenState extends State<GameScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           // Botão de anúncio recompensado quando o jogador está travado
-                          if (!gameState.isCompleted &&
-                              gameState.guesses.isNotEmpty && gameState.guesses
-                              .length >= 5)
-                            Padding(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: context.responsiveValue(
-                                  small: 12.0,
-                                  medium: 16.0,
-                                  large: 20.0,
-                                ),
-                                vertical: 4.0,
-                              ),
-                              child: RewardedAdButton(
-                                text: 'Obter uma dica',
-                                rewardText: 'Carregando sua dica...',
-                                icon: Icons.lightbulb_outline,
-                                onRewarded: () async {
-                                  // Busca a dica
-                                  final hintWord = await _getHintWord(
-                                      gameState);
+                          FutureBuilder<String?>(
+                            future: _getAvailableHintWord(gameState),
+                            builder: (context, snapshot) {
+                              // Se não há dica disponível, retorna um SizedBox vazio
+                              if (!snapshot.hasData ||
+                                  snapshot.data == null ||
+                                  snapshot.data!.isEmpty ||
+                                  !gameState.guesses.isNotEmpty ||
+                                  gameState.guesses.length < 5) {
+                                return const SizedBox.shrink();
+                              }
 
-                                  // Lógica para conceder uma dica ao usuário
-                                  if (mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          'Dica: Uma palavra relacionada é "$hintWord"',
-                                          style: TextStyle(fontSize: context
-                                              .responsiveFontSize(14)),
+                              return Padding(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: context.responsiveValue(
+                                    small: 12.0,
+                                    medium: 16.0,
+                                    large: 20.0,
+                                  ),
+                                  vertical: 4.0,
+                                ),
+                                child: RewardedAdButton(
+                                  text: 'Obter uma dica',
+                                  rewardText: 'Carregando sua dica...',
+                                  icon: Icons.lightbulb_outline,
+                                  onRewarded: () async {
+                                    final hintWord = snapshot.data!;
+
+                                    // Lógica para conceder uma dica ao usuário
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'Dica: Uma palavra relacionada é "$hintWord"',
+                                            style: TextStyle(fontSize: context
+                                                .responsiveFontSize(14)),
+                                          ),
+                                          backgroundColor: ColorConstants.info,
+                                          behavior: SnackBarBehavior.floating,
+                                          duration: const Duration(seconds: 5),
                                         ),
-                                        backgroundColor: ColorConstants.info,
-                                        behavior: SnackBarBehavior.floating,
-                                        duration: const Duration(seconds: 5),
-                                      ),
-                                    );
-                                  }
-                                },
-                              ),
-                            ),
+                                      );
+                                    }
+                                  },
+                                ),
+                              );
+                            },
+                          ),
 
                           // Campo de entrada para novas tentativas
                           if (!gameState.isCompleted)
@@ -200,9 +275,7 @@ class _GameScreenState extends State<GameScreen> {
                                 controller: _guessController,
                                 isLoading: state is GameLoading,
                                 onSubmitted: (guess) {
-                                  if (guess
-                                      .trim()
-                                      .isNotEmpty) {
+                                  if (guess.trim().isNotEmpty) {
                                     FocusScope.of(context).unfocus();
                                     context.read<GameBloc>().add(
                                         GuessSubmitted(guess.trim()));
@@ -304,30 +377,6 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
-  void _showNewWordDialog(BuildContext context) {
-    // Limpar a flag para não mostrar o diálogo novamente
-    final gameBloc = context.read<GameBloc>();
-
-    // Mostrar o diálogo depois de um breve atraso para garantir que a interface foi carregada
-    Future.delayed(const Duration(milliseconds: 300), () {
-      if (mounted) {
-        showDialog(
-          context: context,
-          barrierDismissible: false, // Não permite fechar clicando fora
-          builder: (context) => NewWordDialog(
-            onContinue: () {
-              // Fechar o diálogo
-              Navigator.of(context).pop();
-
-              // Limpar a flag no bloc
-              gameBloc.clearNewWordDialogFlag();
-            },
-          ),
-        );
-      }
-    });
-  }
-
   void _showErrorSnackBar(BuildContext context, String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -344,88 +393,87 @@ class _GameScreenState extends State<GameScreen> {
   void _showInfoDialog(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) =>
-          AlertDialog(
-            title: Text(
-              'Como Jogar',
-              style: TextStyle(
-                fontSize: context.responsiveFontSize(18),
-                fontWeight: FontWeight.bold,
-              ),
+      builder: (context) => AlertDialog(
+      title: Text(
+      'Como Jogar',
+      style: TextStyle(
+        fontSize: context.responsiveFontSize(18),
+        fontWeight: FontWeight.bold,
+      ),
+    ),
+    content: SingleChildScrollView(
+    child: Column(
+    mainAxisSize: MainAxisSize.min,
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+    Text(
+    'Tente adivinhar a palavra secreta do dia!',
+      style: TextStyle(
+        fontWeight: FontWeight.bold,
+        fontSize: context.responsiveFontSize(15),
+      ),
+    ),
+      SizedBox(height: context.responsiveSize(16)),
+      Text(
+        '1. Digite uma palavra e veja quão próxima ela está da palavra-alvo.',
+        style: TextStyle(fontSize: context.responsiveFontSize(14)),
+      ),
+      SizedBox(height: context.responsiveSize(8)),
+      Text(
+        '2. A porcentagem indica a proximidade semântica entre sua palavra e a palavra-alvo.',
+        style: TextStyle(fontSize: context.responsiveFontSize(14)),
+      ),
+      SizedBox(height: context.responsiveSize(8)),
+      Text(
+        '3. Use as dicas para se aproximar da palavra certa.',
+        style: TextStyle(fontSize: context.responsiveFontSize(14)),
+      ),
+      SizedBox(height: context.responsiveSize(8)),
+      Text(
+        '4. Se a palavra não estiver no contexto semântico, ela será analisada por similaridade linguística, considerando aspectos como coincidência de letras com a palavra secreta.',
+        style: TextStyle(fontSize: context.responsiveFontSize(14), fontWeight: FontWeight.bold),
+      ),
+      SizedBox(height: context.responsiveSize(8)),
+      Text(
+        '5. Tente acertar com o menor número possível de tentativas!',
+        style: TextStyle(fontSize: context.responsiveFontSize(14)),
+      ),
+      SizedBox(height: context.responsiveSize(16)),
+      Text(
+        'Exemplo:',
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: context.responsiveFontSize(15),
+        ),
+      ),
+      SizedBox(height: context.responsiveSize(8)),
+      Text(
+        'Se a palavra-alvo for "cachorro" e você digitar "gato", a similaridade pode ser cerca de 70%.',
+        style: TextStyle(fontSize: context.responsiveFontSize(14)),
+      ),
+      SizedBox(height: context.responsiveSize(8)),
+      Text(
+        'Se você digitar "animal", a similaridade pode ser cerca de 50%.',
+        style: TextStyle(fontSize: context.responsiveFontSize(14)),
+      ),
+      SizedBox(height: context.responsiveSize(8)),
+      Text(
+        'A palavra exata terá 100% de similaridade.',
+        style: TextStyle(fontSize: context.responsiveFontSize(14)),
+      ),
+    ],
+    ),
+    ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(
+              'OK',
+              style: TextStyle(fontSize: context.responsiveFontSize(14)),
             ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Tente adivinhar a palavra secreta do dia!',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: context.responsiveFontSize(15),
-                    ),
-                  ),
-                  SizedBox(height: context.responsiveSize(16)),
-                  Text(
-                    '1. Digite uma palavra e veja quão próxima ela está da palavra-alvo.',
-                    style: TextStyle(fontSize: context.responsiveFontSize(14)),
-                  ),
-                  SizedBox(height: context.responsiveSize(8)),
-                  Text(
-                    '2. A porcentagem indica a proximidade semântica entre sua palavra e a palavra-alvo.',
-                    style: TextStyle(fontSize: context.responsiveFontSize(14)),
-                  ),
-                  SizedBox(height: context.responsiveSize(8)),
-                  Text(
-                    '3. Use as dicas para se aproximar da palavra certa.',
-                    style: TextStyle(fontSize: context.responsiveFontSize(14)),
-                  ),
-                  SizedBox(height: context.responsiveSize(8)),
-                  Text(
-                    '4. Se a palavra não estiver no contexto semântico, ela será analisada por similaridade linguística, considerando aspectos como coincidência de letras com a palavra secreta.',
-                    style: TextStyle(fontSize: context.responsiveFontSize(14), fontWeight: FontWeight.bold),
-                  ),
-                  SizedBox(height: context.responsiveSize(8)),
-                  Text(
-                    '5. Tente acertar com o menor número possível de tentativas!',
-                    style: TextStyle(fontSize: context.responsiveFontSize(14)),
-                  ),
-                  SizedBox(height: context.responsiveSize(16)),
-                  Text(
-                    'Exemplo:',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: context.responsiveFontSize(15),
-                    ),
-                  ),
-                  SizedBox(height: context.responsiveSize(8)),
-                  Text(
-                    'Se a palavra-alvo for "cachorro" e você digitar "gato", a similaridade pode ser cerca de 70%.',
-                    style: TextStyle(fontSize: context.responsiveFontSize(14)),
-                  ),
-                  SizedBox(height: context.responsiveSize(8)),
-                  Text(
-                    'Se você digitar "animal", a similaridade pode ser cerca de 50%.',
-                    style: TextStyle(fontSize: context.responsiveFontSize(14)),
-                  ),
-                  SizedBox(height: context.responsiveSize(8)),
-                  Text(
-                    'A palavra exata terá 100% de similaridade.',
-                    style: TextStyle(fontSize: context.responsiveFontSize(14)),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: Text(
-                  'OK',
-                  style: TextStyle(fontSize: context.responsiveFontSize(14)),
-                ),
-              ),
-            ],
           ),
+        ],
+      ),
     );
   }
 
@@ -434,44 +482,18 @@ class _GameScreenState extends State<GameScreen> {
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (context) =>
-            SuccessDialog(
-              targetWord: state.targetWord,
-              attemptCount: state.guesses.length,
-              bestScore: state.bestScore,
-              onShare: () {
-                Navigator.of(context).pop();
-                _shareResults(context, state);
-              },
-              onClose: () => Navigator.of(context).pop(),
-            ),
-      );
-    });
-  }
-
-  void _checkForNewWord(BuildContext context, GameLoaded state) {
-    // Verifica se o GameBloc tem uma notificação de nova palavra
-    if (state.hasNewWordAvailable == true) {
-      // Mostra um diálogo informando sobre a nova palavra
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => AlertDialog(
-          contentPadding: EdgeInsets.zero,
-          content: NewWordNotification(
-            onRefresh: () {
-              // Atualiza o jogo com a nova palavra
-              context.read<GameBloc>().add(const GameRefreshDaily());
-            },
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          backgroundColor: Colors.transparent,
-          elevation: 0,
+        builder: (context) => SuccessDialog(
+          targetWord: state.targetWord,
+          attemptCount: state.guesses.length,
+          bestScore: state.bestScore,
+          onShare: () {
+            Navigator.of(context).pop();
+            _shareResults(context, state);
+          },
+          onClose: () => Navigator.of(context).pop(),
         ),
       );
-    }
+    });
   }
 
   void _shareResults(BuildContext context, GameLoaded state) {
@@ -483,76 +505,5 @@ class _GameScreenState extends State<GameScreen> {
       context: context,
       shareText: shareText,
     );
-  }
-
-  // Método auxiliar para obter uma dica para o anúncio recompensado
-  Future<String> _getHintWord(GameLoaded state) async {
-    try {
-      // Referência ao Firestore
-      final firestore = FirebaseFirestore.instance;
-
-      // Busca a palavra na coleção de words para obter suas relações
-      final wordDoc = await firestore.collection('words').doc(
-          state.targetWord.toLowerCase()).get();
-
-      if (wordDoc.exists && wordDoc.data() != null &&
-          wordDoc.data()!.containsKey('relations')) {
-        // Obtém as relações da palavra alvo
-        final relations = wordDoc.data()!['relations'] as Map<String, dynamic>;
-
-        if (relations.isNotEmpty) {
-          // Converte para uma lista de entradas (palavra, similaridade)
-          final relationsList = relations.entries.toList();
-
-          // Ordena pela similaridade (do maior para o menor)
-          relationsList.sort((a, b) =>
-              (b.value as num).compareTo(a.value as num));
-
-          // Filtra para não retornar palavras que o usuário já tentou
-          final usedWords = state.guesses
-              .map((g) => g.word.toLowerCase())
-              .toSet();
-          final availableHints = relationsList.where((entry) =>
-          !usedWords.contains(entry.key) && (entry.value as num) > 0.6)
-              .toList();
-
-          // Se temos dicas disponíveis, retorna uma aleatoriamente entre as top 3
-          if (availableHints.isNotEmpty) {
-            final random = Random();
-            final topIndex = random.nextInt(math.min(3, availableHints.length));
-            return availableHints[topIndex].key;
-          }
-        }
-      }
-
-      // Fallback para o método antigo se não conseguir encontrar uma relação
-      // Ordena as tentativas por similaridade (da maior para a menor)
-      if (state.guesses.isEmpty) {
-        return "categoria";
-      }
-
-      final sortedGuesses = List<Guess>.from(state.guesses)
-        ..sort((a, b) => b.similarity.compareTo(a.similarity));
-
-      // Retorna a palavra mais próxima como dica
-      if (sortedGuesses.isNotEmpty && sortedGuesses.first.similarity > 0.5) {
-        return sortedGuesses.first.word;
-      }
-
-      // Lista de palavras relacionadas genéricas caso não tenha uma boa dica
-      final genericHints = [
-        'objeto', 'conceito', 'animal', 'lugar', 'ação',
-        'sentimento', 'natureza', 'tecnologia', 'pessoa',
-      ];
-
-      // Retorna uma dica genérica
-      return genericHints[DateTime
-          .now()
-          .microsecond % genericHints.length];
-    } catch (e) {
-      print('Erro ao buscar dica: $e');
-      // Retorna uma palavra genérica em caso de erro
-      return 'substantivo';
-    }
   }
 }
