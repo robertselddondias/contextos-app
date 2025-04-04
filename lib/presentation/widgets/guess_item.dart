@@ -17,10 +17,12 @@ class GuessItem extends StatelessWidget {
   });
 
   @override
+  // lib/presentation/widgets/guess_item.dart
+
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
-    // Cores base baseadas na similaridade (para todas as palavras)
+    // Cores baseadas na similaridade (mantém o comportamento original)
     final similarityColor = ColorConstants.getSimilarityColor(
       guess.similarity,
       darkMode: isDarkMode,
@@ -44,10 +46,10 @@ class GuessItem extends StatelessWidget {
         horizontal: 16,
         vertical: 6,
       ),
-      elevation: isExactMatch ? 4 : 2,
+      elevation: isExactMatch ? 4 : (guess.isHint ? 3 : 2), // Elevação sutilmente maior para dicas
       shadowColor: isExactMatch
           ? ColorConstants.success.withOpacity(0.4)
-          : Colors.black.withOpacity(0.1),
+          : (guess.isHint ? Colors.blue.withOpacity(0.3) : Colors.black.withOpacity(0.1)), // Sombra azulada para dicas
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: isExactMatch
@@ -55,34 +57,50 @@ class GuessItem extends StatelessWidget {
           color: ColorConstants.success,
           width: 2,
         )
-            : BorderSide.none,
+            : (guess.isHint
+            ? BorderSide(
+          color: Colors.blue.withOpacity(0.5),
+          width: 1,
+        )
+            : BorderSide.none),
       ),
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           gradient: gradient,
-        ),
-        child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 12,
-          ),
-          leading: Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: textColor.withOpacity(0.15),
-              border: Border.all(
-                color: textColor.withOpacity(0.3),
-                width: 1,
-              ),
+          // Efeito adicional sutil para dicas - um padrão de brilho no canto
+          boxShadow: guess.isHint
+              ? [
+            BoxShadow(
+              color: Colors.white.withOpacity(0.1),
+              blurRadius: 15,
+              spreadRadius: -5,
+              offset: const Offset(-5, -5),
             ),
-            child: Center(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
+          ]
+              : null,
+        ),
+        child: Stack(
+          children: [
+            // Tile principal - mantém o desenho original
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 12,
+              ),
+              leading: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: textColor.withOpacity(0.15),
+                  border: Border.all(
+                    color: textColor.withOpacity(0.3),
+                    width: 1,
+                  ),
+                ),
+                child: Center(
+                  child: Text(
                     rank.toString(),
                     style: TextStyle(
                       color: textColor,
@@ -90,75 +108,66 @@ class GuessItem extends StatelessWidget {
                       fontSize: 16,
                     ),
                   ),
-                  if (guess.isHint)
-                    Icon(
-                      Icons.lightbulb,
-                      size: 14,
-                      color: textColor.withOpacity(0.7),
+                ),
+              ),
+              title: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _capitalize(guess.word),
+                      style: TextStyle(
+                        color: textColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: textColor.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: textColor.withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: Text(
+                      percentFormat.format(guess.similarity),
+                      style: TextStyle(
+                        color: textColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
                 ],
               ),
+              subtitle: Text(
+                _getTimeAgoString(guess.timestamp),
+                style: TextStyle(
+                  color: textColor.withOpacity(0.7),
+                  fontSize: 12,
+                ),
+              ),
             ),
-          ),
-          title: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  _capitalize(guess.word),
-                  style: TextStyle(
-                    color: textColor,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: textColor.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: textColor.withOpacity(0.3),
-                    width: 1,
-                  ),
-                ),
-                child: Text(
-                  percentFormat.format(guess.similarity),
-                  style: TextStyle(
-                    color: textColor,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          subtitle: Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: Row(
-              children: [
-                Icon(
-                  guess.isHint ? Icons.lightbulb_outline : Icons.access_time,
+
+            // Ícone de lâmpada no canto para dicas
+            if (guess.isHint)
+              Positioned(
+                bottom: 12,
+                right: 12,
+                child: Icon(
+                  Icons.lightbulb_outline,
                   size: 14,
                   color: textColor.withOpacity(0.7),
                 ),
-                const SizedBox(width: 4),
-                Text(
-                  guess.isHint
-                      ? 'Palavra sugerida'
-                      : _getTimeAgoString(guess.timestamp),
-                  style: TextStyle(
-                    color: textColor.withOpacity(0.7),
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
+              ),
+          ],
         ),
       ),
     );
