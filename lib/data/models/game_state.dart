@@ -41,6 +41,7 @@ class GameStateModel {
     );
   }
 
+  @override
   Map<String, dynamic> toJson() {
     return {
       'targetWord': targetWord,
@@ -49,7 +50,6 @@ class GameStateModel {
       'bestScore': bestScore,
       'dailyWordId': dailyWordId,
       'wasShared': wasShared,
-      'hasNewWordAvailable': hasNewWordAvailable,
     };
   }
 

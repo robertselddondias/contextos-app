@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:contextual/core/constants/app_constants.dart';
 import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -122,47 +123,24 @@ class PurchaseManager {
     }
   }
 
-  /// Carrega o estado "remover anúncios" das preferências
   Future<void> _loadRemoveAdsState() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      _removeAdsActive = prefs.getBool('remove_ads_active') ?? false;
+      _removeAdsActive = prefs.getBool(AppConstants.prefsKeyRemoveAdsActive) ?? false;
 
-      // Notificar ouvintes
-      _notifyStateChange();
+      // Notificar ouvintes através do stream controller
+      _purchaseStateController.add(_removeAdsActive);
 
       if (kDebugMode) {
-        print('Estado remove_ads_active carregado: $_removeAdsActive');
+        print('PurchaseManager: Estado remove_ads_active carregado: $_removeAdsActive');
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Erro ao carregar estado remover anúncios: $e');
+        print('PurchaseManager: Erro ao carregar estado remover anúncios: $e');
       }
     }
   }
 
-  /// Salva o estado "remover anúncios" nas preferências
-  Future<void> _saveRemoveAdsState(bool isActive) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('remove_ads_active', isActive);
-
-      _removeAdsActive = isActive;
-
-      // Notificar ouvintes
-      _notifyStateChange();
-
-      if (kDebugMode) {
-        print('Estado remove_ads_active salvo: $isActive');
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('Erro ao salvar estado remover anúncios: $e');
-      }
-    }
-  }
-
-  /// Inicia uma compra
   Future<bool> buyRemoveAds() async {
     if (!_isAvailable || _purchasePending) {
       return false;
@@ -194,6 +172,26 @@ class PurchaseManager {
         print('Erro ao iniciar compra: $e');
       }
       return false;
+    }
+  }
+
+  Future<void> _saveRemoveAdsState(bool isActive) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(AppConstants.prefsKeyRemoveAdsActive, isActive);
+
+      _removeAdsActive = isActive;
+
+      // Notificar ouvintes através do stream controller
+      _purchaseStateController.add(_removeAdsActive);
+
+      if (kDebugMode) {
+        print('PurchaseManager: Estado remove_ads_active salvo: $isActive');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('PurchaseManager: Erro ao salvar estado remover anúncios: $e');
+      }
     }
   }
 

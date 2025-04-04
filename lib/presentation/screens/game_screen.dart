@@ -245,7 +245,9 @@ class _GameScreenState extends State<GameScreen> {
                                   onRewarded: () async {
                                     final hintWord = snapshot.data!;
 
-                                    // Lógica para conceder uma dica ao usuário
+                                    context.read<GameBloc>().add(GuessSubmitted(hintWord, isHint: true));
+                                    context.read<GameBloc>().add(const GameRefreshDaily(isAfterAd: true));
+
                                     if (mounted) {
                                       ScaffoldMessenger.of(context).showSnackBar(
                                         SnackBar(

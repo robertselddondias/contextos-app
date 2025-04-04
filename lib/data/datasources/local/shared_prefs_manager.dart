@@ -37,6 +37,9 @@ class SharedPrefsManagerImpl implements SharedPrefsManager {
     final jsonString = json.encode(gameState.toJson());
     await _prefs.setString(AppConstants.prefsKeyGameState, jsonString);
 
+    // Também salvamos a data do estado para verificação de validade
+    await _prefs.setString(AppConstants.prefsKeyGameStateDate, gameState.dailyWordId);
+
     // Também salvamos a data do último jogo
     await _prefs.setString(
       AppConstants.prefsKeyLastPlayed,
@@ -53,7 +56,10 @@ class SharedPrefsManagerImpl implements SharedPrefsManager {
       final jsonMap = json.decode(jsonString) as Map<String, dynamic>;
       return GameStateModel.fromJson(jsonMap);
     } catch (e) {
-      // Em caso de erro, retornamos null para começar um novo jogo
+      // Em caso de erro, limpar o estado corrompido
+      await _prefs.remove(AppConstants.prefsKeyGameState);
+      await _prefs.remove(AppConstants.prefsKeyGameStateDate);
+
       return null;
     }
   }
@@ -61,8 +67,10 @@ class SharedPrefsManagerImpl implements SharedPrefsManager {
   @override
   Future<void> clearGameState() async {
     await _prefs.remove(AppConstants.prefsKeyGameState);
+    await _prefs.remove(AppConstants.prefsKeyGameStateDate);
     await _prefs.remove(AppConstants.prefsKeyLastPlayed);
   }
+
 
   @override
   Future<void> saveBestScore(int score) async {
@@ -119,14 +127,14 @@ class SharedPrefsManagerImpl implements SharedPrefsManager {
   @override
   Future<void> saveDailyWord(String word, String dailyWordId) async {
     await _prefs.setString(
-      '${AppConstants.prefsKeyDailyWord}_$dailyWordId',
+      '${AppConstants.prefixDailyWord}$dailyWordId',
       word,
     );
   }
 
   @override
   Future<String?> getDailyWord(String dailyWordId) async {
-    return _prefs.getString('${AppConstants.prefsKeyDailyWord}_$dailyWordId');
+    return _prefs.getString('${AppConstants.prefixDailyWord}$dailyWordId');
   }
 
   @override
@@ -142,14 +150,14 @@ class SharedPrefsManagerImpl implements SharedPrefsManager {
       word2 = temp;
     }
 
-    final key = 'similarity_${word1}_$word2';
+    final key = '${AppConstants.prefixSimilarity}${word1}_$word2';
     await _prefs.setDouble(key, similarity);
 
     // Adicionamos a entrada ao índice de similaridades para poder limpar o cache posteriormente
-    final index = _prefs.getStringList('similarity_index') ?? [];
+    final index = _prefs.getStringList(AppConstants.prefsKeySimilarityIndex) ?? [];
     if (!index.contains(key)) {
       index.add(key);
-      await _prefs.setStringList('similarity_index', index);
+      await _prefs.setStringList(AppConstants.prefsKeySimilarityIndex, index);
 
       // Limitamos o tamanho do cache
       if (index.length > 1000) {
@@ -160,7 +168,7 @@ class SharedPrefsManagerImpl implements SharedPrefsManager {
         }
 
         // Atualiza o índice
-        await _prefs.setStringList('similarity_index', index.sublist(200));
+        await _prefs.setStringList(AppConstants.prefsKeySimilarityIndex, index.sublist(200));
       }
     }
   }
@@ -178,7 +186,7 @@ class SharedPrefsManagerImpl implements SharedPrefsManager {
       word2 = temp;
     }
 
-    final key = 'similarity_${word1}_$word2';
+    final key = '${AppConstants.prefixSimilarity}${word1}_$word2';
     return _prefs.getDouble(key);
   }
 }

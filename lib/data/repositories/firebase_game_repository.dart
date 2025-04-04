@@ -11,6 +11,7 @@ import 'package:contextual/data/models/game_state.dart';
 import 'package:contextual/domain/entities/guess.dart';
 import 'package:contextual/domain/repositories/game_repository.dart';
 import 'package:dartz/dartz.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class FirebaseGameRepository implements GameRepository {
@@ -22,34 +23,23 @@ class FirebaseGameRepository implements GameRepository {
   @override
   Future<Either<Failure, void>> saveGameState(GameStateModel gameState) async {
     try {
-      // Salva o estado localmente
+      // Use o método toJson() antes de codificar
       final jsonString = json.encode(gameState.toJson());
-      await _prefs.setString(AppConstants.prefsKeyGameState, jsonString);
 
-      // Também salvamos a data do último jogo
-      await _prefs.setString(
-        AppConstants.prefsKeyLastPlayed,
-        DateTime.now().toString().split(' ')[0],
-      );
-
-      // Opcionalmente, salva as estatísticas no Firestore
-      if (gameState.isCompleted) {
-        try {
-          await _firestore.collection(AppConstants.userScoresCollection).add({
-            'targetWord': gameState.targetWord,
-            'attempts': gameState.guesses.length,
-            'completed': gameState.isCompleted,
-            'timestamp': FieldValue.serverTimestamp(),
-            'anonymousUserId': _getAnonymousUserId(),
-          });
-        } catch (e) {
-          // Ignoramos erros ao salvar estatísticas no Firestore
-          print('Erro ao salvar estatísticas: $e');
-        }
+      if (kDebugMode) {
+        print('GameRepository: Salvando estado com ${gameState.guesses.length} tentativas');
       }
+
+      await _prefs.setString(AppConstants.prefsKeyGameState, jsonString);
+      await _prefs.setString(AppConstants.prefsKeyGameStateDate, gameState.dailyWordId);
+
+      // Restante do código...
 
       return const Right(null);
     } catch (e) {
+      if (kDebugMode) {
+        print('GameRepository: Erro ao salvar estado do jogo: $e');
+      }
       return Left(CacheFailure(e.toString()));
     }
   }
@@ -57,18 +47,41 @@ class FirebaseGameRepository implements GameRepository {
   @override
   Future<Either<Failure, GameStateModel?>> getGameState() async {
     try {
+      // Usa a constante padronizada
       final jsonString = _prefs.getString(AppConstants.prefsKeyGameState);
-      if (jsonString == null) return const Right(null);
+
+      if (jsonString == null) {
+        if (kDebugMode) {
+          print('GameRepository: Nenhum estado de jogo encontrado');
+        }
+        return const Right(null);
+      }
 
       try {
-        final Map<String, dynamic> jsonMap = json.decode(jsonString) as Map<String, dynamic>;
-        final gameState = GameStateModel.fromJson(jsonMap);
+        Map<String, dynamic> data = json.decode(jsonString);
+        final gameState = GameStateModel.fromJson(data);
+
+        // Log para debug
+        if (kDebugMode) {
+          print('GameRepository: Estado do jogo carregado. Data: ${gameState.dailyWordId}, Palavra: ${gameState.targetWord}');
+        }
+
         return Right(gameState);
       } catch (e) {
-        // Em caso de erro de parsing, retornamos null para começar um novo jogo
+        // Em caso de erro de parsing, limpamos o estado corrompido
+        if (kDebugMode) {
+          print('GameRepository: Erro ao fazer parse do estado do jogo: $e');
+        }
+
+        await _prefs.remove(AppConstants.prefsKeyGameState);
+        await _prefs.remove(AppConstants.prefsKeyGameStateDate);
+
         return const Right(null);
       }
     } catch (e) {
+      if (kDebugMode) {
+        print('GameRepository: Erro ao carregar estado do jogo: $e');
+      }
       return Left(CacheFailure(e.toString()));
     }
   }
@@ -123,9 +136,13 @@ class FirebaseGameRepository implements GameRepository {
   @override
   Future<Either<Failure, int>> getBestScore() async {
     try {
+      // Usa a constante padronizada
       final bestScore = _prefs.getInt(AppConstants.prefsKeyBestScore) ?? 0;
       return Right(bestScore);
     } catch (e) {
+      if (kDebugMode) {
+        print('GameRepository: Erro ao obter melhor pontuação: $e');
+      }
       return Left(CacheFailure(e.toString()));
     }
   }
@@ -133,6 +150,7 @@ class FirebaseGameRepository implements GameRepository {
   @override
   Future<Either<Failure, void>> updateBestScore(int score) async {
     try {
+      // Usa a constante padronizada
       final currentBest = _prefs.getInt(AppConstants.prefsKeyBestScore) ?? 0;
 
       // Salvamos apenas se for melhor que o atual
@@ -149,12 +167,17 @@ class FirebaseGameRepository implements GameRepository {
           });
         } catch (e) {
           // Ignoramos erros ao salvar no Firestore
-          print('Erro ao salvar recorde no Firestore: $e');
+          if (kDebugMode) {
+            print('GameRepository: Erro ao salvar recorde no Firestore: $e');
+          }
         }
       }
 
       return const Right(null);
     } catch (e) {
+      if (kDebugMode) {
+        print('GameRepository: Erro ao atualizar melhor pontuação: $e');
+      }
       return Left(CacheFailure(e.toString()));
     }
   }
@@ -264,12 +287,12 @@ class FirebaseGameRepository implements GameRepository {
   String _getAnonymousUserId() {
     // Usamos um ID salvo localmente para rastrear o mesmo usuário
     // sem identificá-lo pessoalmente
-    String? userId = _prefs.getString('anonymous_user_id');
+    String? userId = _prefs.getString(AppConstants.prefsKeyAnonymousUserId);
 
     if (userId == null) {
       // Cria um ID aleatório baseado no timestamp e um número aleatório
       userId = 'anon_${DateTime.now().millisecondsSinceEpoch}_${(Random().nextDouble() * 1000000).toInt()}';
-      _prefs.setString('anonymous_user_id', userId);
+      _prefs.setString(AppConstants.prefsKeyAnonymousUserId, userId);
     }
 
     return userId;

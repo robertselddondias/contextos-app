@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:contextual/core/constants/app_constants.dart';
 import 'package:contextual/services/purchase_manager.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
@@ -211,11 +212,10 @@ class AdManager with WidgetsBindingObserver {
   Future<void> _loadPremiumStatus() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      _isPremium = prefs.getBool('premium_user') ?? false;
-      debugPrint(
-          'AdManager: Status premium carregado de preferências: $_isPremium');
+      _isPremium = prefs.getBool(AppConstants.prefsKeyPremiumUser) ?? false;
+      debugPrint('AdService: Premium status loaded: $_isPremium');
     } catch (e) {
-      debugPrint('AdManager: Erro ao carregar status premium: $e');
+      debugPrint('AdService: Error loading premium status: $e');
       _isPremium = false;
     }
   }
@@ -237,32 +237,26 @@ class AdManager with WidgetsBindingObserver {
     }
   }
 
-  /// Carrega configurações relacionadas a anúncios das preferências compartilhadas.
   Future<void> _loadSettings() async {
     try {
       final prefs = await SharedPreferences.getInstance();
 
-      // Carrega configuração de frequência de anúncios intersticial
-      _interstitialFrequency = prefs.getInt('interstitial_frequency') ?? 3;
+      // Load interstitial frequency setting
+      _interstitialFrequency = prefs.getInt(AppConstants.prefsKeyInterstitialFrequency) ?? 3;
 
-      // Carrega contagem de anúncios intersticial
-      _interstitialAdCount = prefs.getInt('interstitial_ad_count') ?? 0;
+      // Load interstitial ad count
+      _interstitialAdCount = prefs.getInt(AppConstants.prefsKeyInterstitialAdCount) ?? 0;
 
-      // Carrega timestamp da última exibição
-      final lastShownStr = prefs.getString('last_interstitial_shown');
+      // Load last shown timestamp
+      final lastShownStr = prefs.getString(AppConstants.prefsKeyLastInterstitialShown);
       if (lastShownStr != null) {
-        try {
-          _lastInterstitialShown = DateTime.parse(lastShownStr);
-        } catch (e) {
-          debugPrint('AdManager: Erro ao analisar data da última exibição: $e');
-          _lastInterstitialShown = null;
-        }
+        _lastInterstitialShown = DateTime.parse(lastShownStr);
       }
 
-      debugPrint('AdManager: Configurações carregadas');
+      debugPrint('AdService: Settings loaded');
     } catch (e) {
-      debugPrint('AdManager: Erro ao carregar configurações: $e');
-      // Usa padrões se as configurações não puderem ser carregadas
+      debugPrint('AdService: Error loading settings: $e');
+      // Use defaults if settings couldn't be loaded
       _interstitialFrequency = 3;
       _interstitialAdCount = 0;
       _lastInterstitialShown = null;
@@ -658,77 +652,78 @@ class AdManager with WidgetsBindingObserver {
     return showInterstitial();
   }
 
-  /// Mostra um anúncio recompensado com tratamento robusto de erros para iOS.
-  ///
-  /// Retorna true se o usuário ganhou a recompensa, false caso contrário.
-  /// Opcionalmente aceita um callback para lidar com a recompensa.
   Future<bool> showRewardedAd({Function(RewardItem)? onRewarded}) async {
-    // Tentativa de inicialização se necessário
-    if (!_isInitialized) {
-      try {
-        await initialize();
-      } catch (e) {
-        debugPrint('AdManager: Erro ao inicializar durante showRewardedAd: $e');
-        return false;
-      }
-    }
-
-    // Não mostra anúncios para usuários premium
-    if (_isPremium) return false;
-
-    // Verifica se o anúncio está disponível
-    if (_rewardedAd == null) {
-      debugPrint(
-          'AdManager: Tentativa de mostrar recompensado, mas anúncio não está disponível');
-      _loadRewardedAd(); // Tenta carregar novamente
-      return false;
-    }
+    if (_isPremium || _rewardedAd == null) return false;
 
     final completer = Completer<bool>();
-    bool hasRewarded = false;
 
     try {
-      final RewardedAd ad = _rewardedAd!;
-
-      // Referência temporária para evitar problemas de concorrência
-      _rewardedAd = null;
-
-      await ad.show(onUserEarnedReward: (ad, reward) {
-        hasRewarded = true;
-
-        // Chama o callback de recompensa se fornecido
+      await _rewardedAd!.show(onUserEarnedReward: (ad, reward) {
+        // Chamar o callback de recompensa diretamente se fornecido
         if (onRewarded != null) {
           onRewarded(reward);
         }
 
-        debugPrint(
-            'AdManager: Usuário ganhou recompensa: ${reward.amount} ${reward
-                .type}');
+        if (kDebugMode) {
+          print('AdManager: Usuário ganhou recompensa: ${reward.amount} ${reward.type}');
+        }
+
         if (!completer.isCompleted) {
           completer.complete(true);
         }
       });
 
-      // Adiciona um timeout para garantir que o completer sempre complete
-      Future.delayed(const Duration(seconds: 30), () {
-        if (!completer.isCompleted) {
-          debugPrint('AdManager: Timeout ao mostrar anúncio recompensado');
-          if (hasRewarded) {
-            completer.complete(true);
-          } else {
+      // O fullScreenContentCallback vai lidar com o fechamento do anúncio e erros
+      _rewardedAd!.fullScreenContentCallback = FullScreenContentCallback(
+        onAdShowedFullScreenContent: (ad) {
+          if (kDebugMode) {
+            print('AdManager: Anúncio exibido em tela cheia');
+          }
+        },
+        onAdDismissedFullScreenContent: (ad) {
+          if (kDebugMode) {
+            print('AdManager: Anúncio fechado pelo usuário');
+          }
+
+          ad.dispose();
+          _rewardedAd = null;
+
+          // Recarrega o anúncio para uso futuro
+          _loadRewardedAd();
+
+          // Não fazemos nenhuma atualização de estado aqui
+        },
+        onAdFailedToShowFullScreenContent: (ad, error) {
+          if (kDebugMode) {
+            print('AdManager: Falha ao exibir anúncio: ${error.message}');
+          }
+
+          ad.dispose();
+          _rewardedAd = null;
+
+          // Recarrega o anúncio para uso futuro
+          _loadRewardedAd();
+
+          if (!completer.isCompleted) {
             completer.complete(false);
           }
-        }
-      });
-    } catch (e) {
-      debugPrint('AdManager: Erro ao mostrar anúncio recompensado: $e');
+        },
+        onAdImpression: (ad) {
+          if (kDebugMode) {
+            print('AdManager: Impressão de anúncio registrada');
+          }
+        },
+      );
 
-      // Limpa a referência em caso de erro
+    } catch (e) {
+      if (kDebugMode) {
+        print('AdManager: Erro ao exibir anúncio recompensado: $e');
+      }
+
+      // Recarrega após erro
       _rewardedAd?.dispose();
       _rewardedAd = null;
-
-      // Recarrega com um atraso para evitar ciclos de falha
-      Future.delayed(const Duration(seconds: 30), _loadRewardedAd);
+      _loadRewardedAd();
 
       if (!completer.isCompleted) {
         completer.complete(false);

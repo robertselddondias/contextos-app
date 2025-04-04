@@ -36,7 +36,12 @@ class GameShared extends GameEvent {
 }
 
 class GameRefreshDaily extends GameEvent {
-  const GameRefreshDaily();
+  final bool isAfterAd;
+
+  const GameRefreshDaily({this.isAfterAd = false});
+
+  @override
+  List<Object> get props => [isAfterAd];
 }
 
 class NewWordDetected extends GameEvent {

@@ -20,31 +20,19 @@ class GuessItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
-    // Cores base
+    // Cores base baseadas na similaridade (para todas as palavras)
     final similarityColor = ColorConstants.getSimilarityColor(
       guess.similarity,
       darkMode: isDarkMode,
     );
+
     final textColor = ColorConstants.getSimilarityTextColor(
       guess.similarity,
       darkMode: isDarkMode,
     );
 
-    // Estilo especial para dicas
-    final hintColor = isDarkMode
-        ? Colors.purple.shade200
-        : Colors.purple.shade100;
-    final hintTextColor = isDarkMode
-        ? Colors.white
-        : Colors.black87;
-
-    final gradient = guess.isHint
-        ? LinearGradient(
-      colors: [hintColor, hintColor.withOpacity(0.7)],
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-    )
-        : ColorConstants.getSimilarityGradient(
+    // Gradiente para todas as palavras
+    final gradient = ColorConstants.getSimilarityGradient(
       guess.similarity,
       darkMode: isDarkMode,
     );
@@ -62,11 +50,9 @@ class GuessItem extends StatelessWidget {
           : Colors.black.withOpacity(0.1),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: isExactMatch || guess.isHint
+        side: isExactMatch
             ? BorderSide(
-          color: guess.isHint
-              ? Colors.purple
-              : ColorConstants.success,
+          color: ColorConstants.success,
           width: 2,
         )
             : BorderSide.none,
@@ -86,9 +72,9 @@ class GuessItem extends StatelessWidget {
             height: 40,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: (guess.isHint ? hintTextColor : textColor).withOpacity(0.15),
+              color: textColor.withOpacity(0.15),
               border: Border.all(
-                color: (guess.isHint ? hintTextColor : textColor).withOpacity(0.3),
+                color: textColor.withOpacity(0.3),
                 width: 1,
               ),
             ),
@@ -99,7 +85,7 @@ class GuessItem extends StatelessWidget {
                   Text(
                     rank.toString(),
                     style: TextStyle(
-                      color: guess.isHint ? hintTextColor : textColor,
+                      color: textColor,
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
                     ),
@@ -108,7 +94,7 @@ class GuessItem extends StatelessWidget {
                     Icon(
                       Icons.lightbulb,
                       size: 14,
-                      color: hintTextColor.withOpacity(0.7),
+                      color: textColor.withOpacity(0.7),
                     ),
                 ],
               ),
@@ -120,7 +106,7 @@ class GuessItem extends StatelessWidget {
                 child: Text(
                   _capitalize(guess.word),
                   style: TextStyle(
-                    color: guess.isHint ? hintTextColor : textColor,
+                    color: textColor,
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
                   ),
@@ -133,19 +119,17 @@ class GuessItem extends StatelessWidget {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: (guess.isHint ? hintTextColor : textColor).withOpacity(0.15),
+                  color: textColor.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: (guess.isHint ? hintTextColor : textColor).withOpacity(0.3),
+                    color: textColor.withOpacity(0.3),
                     width: 1,
                   ),
                 ),
                 child: Text(
-                  guess.isHint
-                      ? 'DICA'
-                      : percentFormat.format(guess.similarity),
+                  percentFormat.format(guess.similarity),
                   style: TextStyle(
-                    color: guess.isHint ? hintTextColor : textColor,
+                    color: textColor,
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
                   ),
@@ -160,7 +144,7 @@ class GuessItem extends StatelessWidget {
                 Icon(
                   guess.isHint ? Icons.lightbulb_outline : Icons.access_time,
                   size: 14,
-                  color: (guess.isHint ? hintTextColor : textColor).withOpacity(0.7),
+                  color: textColor.withOpacity(0.7),
                 ),
                 const SizedBox(width: 4),
                 Text(
@@ -168,7 +152,7 @@ class GuessItem extends StatelessWidget {
                       ? 'Palavra sugerida'
                       : _getTimeAgoString(guess.timestamp),
                   style: TextStyle(
-                    color: (guess.isHint ? hintTextColor : textColor).withOpacity(0.7),
+                    color: textColor.withOpacity(0.7),
                     fontSize: 12,
                   ),
                 ),
