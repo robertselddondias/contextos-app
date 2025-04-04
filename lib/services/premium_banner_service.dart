@@ -121,7 +121,7 @@ class PremiumBannerService {
           .where("active", isEqualTo: true).get();
 
       if (docSnapshot.docs.isNotEmpty) {
-        _config = (docSnapshot.docs.first.data() as Map<String, dynamic>) ?? {};
+        _config = docSnapshot.docs.first.data() ?? {};
 
         if (kDebugMode) {
           debugPrint('Configurações do banner premium carregadas do Firebase');
