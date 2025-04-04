@@ -207,7 +207,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   height: 44,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Theme.of(context).colorScheme.surfaceVariant,
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
                   ),
                   child: Icon(
                     Icons.history_outlined,
@@ -490,7 +490,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   shape: BoxShape.circle,
                   color: isSelected
                       ? primaryColor.withOpacity(0.2)
-                      : Theme.of(context).colorScheme.surfaceVariant,
+                      : Theme.of(context).colorScheme.surfaceContainerHighest,
                 ),
                 child: Icon(
                   icon,

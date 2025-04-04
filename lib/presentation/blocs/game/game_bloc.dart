@@ -1,12 +1,10 @@
 // presentation/blocs/game/game_bloc.dart (modificado para usar DailyWordListenerService)
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
 
 import 'package:bloc/bloc.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:contextual/core/constants/app_constants.dart';
-import 'package:contextual/data/datasources/remote/firebase_context_service.dart';
 import 'package:contextual/data/models/game_state.dart';
 import 'package:contextual/domain/entities/guess.dart';
 import 'package:contextual/domain/repositories/game_repository.dart';
@@ -364,10 +362,21 @@ class GameBloc extends Bloc<GameEvent, GameState> {
           emit(currentState);
         },
             (gameState) {
-          // Modifica a última tentativa se for uma dica
-          final updatedGuesses = gameState.guesses.map((guess) {
-            return event.isHint ? guess.copyWith(isHint: true) : guess;
-          }).toList();
+          // Cria uma lista de tentativas atualizada
+          List<Guess> updatedGuesses = [];
+
+          // Se for a última tentativa e for marcada como dica
+          if (event.isHint && gameState.guesses.isNotEmpty) {
+            // Copia todas as tentativas exceto a última
+            updatedGuesses = gameState.guesses.sublist(0, gameState.guesses.length - 1);
+
+            // Adiciona a última tentativa, marcada como dica
+            final lastGuess = gameState.guesses.last;
+            updatedGuesses.add(lastGuess.copyWith(isHint: true));
+          } else {
+            // Se não for dica, mantém as tentativas inalteradas
+            updatedGuesses = gameState.guesses;
+          }
 
           // Salva o novo estado
           _saveGameStateToPrefs(gameState.copyWith(guesses: updatedGuesses));
@@ -737,21 +746,19 @@ class GameBloc extends Bloc<GameEvent, GameState> {
         }
       }
 
-      if (targetWord != null) {
-        // Obter melhor pontuação
-        final bestScore = await _getBestScore();
+      // Obter melhor pontuação
+      final bestScore = await _getBestScore();
 
-        // Criar novo estado de jogo
-        return GameStateModel(
-          targetWord: targetWord,
-          guesses: [], // Limpa todas as tentativas anteriores
-          isCompleted: false,
-          bestScore: bestScore,
-          dailyWordId: dateStr,
-          wasShared: false,
-        );
-      }
-
+      // Criar novo estado de jogo
+      return GameStateModel(
+        targetWord: targetWord,
+        guesses: [], // Limpa todas as tentativas anteriores
+        isCompleted: false,
+        bestScore: bestScore,
+        dailyWordId: dateStr,
+        wasShared: false,
+      );
+    
       throw Exception('Não foi possível obter uma palavra válida');
     } catch (e) {
       if (kDebugMode) {
@@ -821,8 +828,7 @@ class GameBloc extends Bloc<GameEvent, GameState> {
         // Se o estado salvo NÃO corresponde à data atual, não use
         if (savedDate != currentDateStr) {
           if (kDebugMode) {
-            print('GameBloc: Estado do jogo encontrado, mas a data não corresponde à atual. ' +
-                'Data salva: ${state.dailyWordId}, Data atual: $currentDateStr');
+            print('GameBloc: Estado do jogo encontrado, mas a data não corresponde à atual. ' 'Data salva: ${state.dailyWordId}, Data atual: $currentDateStr');
           }
           return null;
         }

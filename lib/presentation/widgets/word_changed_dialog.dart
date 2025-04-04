@@ -8,9 +8,9 @@ class NewWordDialog extends StatelessWidget {
   final VoidCallback onContinue;
 
   const NewWordDialog({
-    Key? key,
+    super.key,
     required this.onContinue,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

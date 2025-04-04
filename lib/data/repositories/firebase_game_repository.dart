@@ -110,7 +110,7 @@ class FirebaseGameRepository implements GameRepository {
       int bestScore = currentState.bestScore;
       if (isCompleted) {
         await updateBestScore(updatedGuesses.length);
-        bestScore = await _prefs.getInt(AppConstants.prefsKeyBestScore) ?? 0;
+        bestScore = _prefs.getInt(AppConstants.prefsKeyBestScore) ?? 0;
       }
 
       // Criamos o novo estado do jogo

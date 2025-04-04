@@ -1,5 +1,4 @@
 // lib/presentation/widgets/premium_banner_widget.dart
-import 'package:contextual/core/constants/color_constants.dart';
 import 'package:contextual/services/premium_banner_service.dart';
 import 'package:contextual/services/purchase_manager.dart';
 import 'package:contextual/utils/responsive_utils.dart';
@@ -8,7 +7,7 @@ import 'package:flutter/services.dart';
 
 /// Widget de banner que promove a versão premium do app
 class PremiumBannerWidget extends StatefulWidget {
-  const PremiumBannerWidget({Key? key}) : super(key: key);
+  const PremiumBannerWidget({super.key});
 
   @override
   State<PremiumBannerWidget> createState() => _PremiumBannerWidgetState();

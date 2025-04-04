@@ -28,11 +28,9 @@ class AppTheme {
       onError: Colors.white,
       errorContainer: ColorConstants.error.withOpacity(0.1),
       onErrorContainer: ColorConstants.error,
-      background: ColorConstants.background,
-      onBackground: ColorConstants.textPrimary,
       surface: ColorConstants.surface,
       onSurface: ColorConstants.textPrimary,
-      surfaceVariant: ColorConstants.surfaceVariant,
+      surfaceContainerHighest: ColorConstants.surfaceVariant,
       onSurfaceVariant: ColorConstants.textSecondary,
       outline: ColorConstants.textHint,
       outlineVariant: ColorConstants.textDisabled,
@@ -195,9 +193,9 @@ class AppTheme {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(4),
       ),
-      checkColor: MaterialStateProperty.all(Colors.white),
-      fillColor: MaterialStateProperty.resolveWith<Color>((states) {
-        if (states.contains(MaterialState.selected)) {
+      checkColor: WidgetStateProperty.all(Colors.white),
+      fillColor: WidgetStateProperty.resolveWith<Color>((states) {
+        if (states.contains(WidgetState.selected)) {
           return ColorConstants.primary;
         }
         return Colors.transparent;
@@ -209,8 +207,8 @@ class AppTheme {
     ),
 
     radioTheme: RadioThemeData(
-      fillColor: MaterialStateProperty.resolveWith<Color>((states) {
-        if (states.contains(MaterialState.selected)) {
+      fillColor: WidgetStateProperty.resolveWith<Color>((states) {
+        if (states.contains(WidgetState.selected)) {
           return ColorConstants.primary;
         }
         return ColorConstants.textSecondary;
@@ -218,19 +216,19 @@ class AppTheme {
     ),
 
     switchTheme: SwitchThemeData(
-      thumbColor: MaterialStateProperty.resolveWith<Color>((states) {
-        if (states.contains(MaterialState.selected)) {
+      thumbColor: WidgetStateProperty.resolveWith<Color>((states) {
+        if (states.contains(WidgetState.selected)) {
           return ColorConstants.primary;
         }
         return Colors.grey;
       }),
-      trackColor: MaterialStateProperty.resolveWith<Color>((states) {
-        if (states.contains(MaterialState.selected)) {
+      trackColor: WidgetStateProperty.resolveWith<Color>((states) {
+        if (states.contains(WidgetState.selected)) {
           return ColorConstants.primary.withOpacity(0.5);
         }
         return Colors.grey.withOpacity(0.5);
       }),
-      trackOutlineColor: MaterialStateProperty.all(Colors.transparent),
+      trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
     ),
 
     dividerTheme: DividerThemeData(
@@ -281,11 +279,9 @@ class AppTheme {
       onError: Colors.white,
       errorContainer: ColorConstants.error.withOpacity(0.2),
       onErrorContainer: Colors.white,
-      background: ColorConstants.darkBackground,
-      onBackground: ColorConstants.darkTextPrimary,
       surface: ColorConstants.darkSurface,
       onSurface: ColorConstants.darkTextPrimary,
-      surfaceVariant: ColorConstants.darkSurfaceVariant,
+      surfaceContainerHighest: ColorConstants.darkSurfaceVariant,
       onSurfaceVariant: ColorConstants.darkTextSecondary,
       outline: ColorConstants.darkTextSecondary.withOpacity(0.7),
       outlineVariant: ColorConstants.darkTextSecondary.withOpacity(0.4),

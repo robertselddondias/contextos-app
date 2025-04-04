@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 
 /// Widget que exibe um botão para compra de "Remover Anúncios"
 class PurchaseButton extends StatefulWidget {
-  const PurchaseButton({Key? key}) : super(key: key);
+  const PurchaseButton({super.key});
 
   @override
   State<PurchaseButton> createState() => _PurchaseButtonState();

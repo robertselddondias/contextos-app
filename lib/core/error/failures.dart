@@ -11,37 +11,37 @@ abstract class Failure extends Equatable {
 }
 
 class ServerFailure extends Failure {
-  const ServerFailure([String message = 'Falha no servidor']) : super(message);
+  const ServerFailure([super.message = 'Falha no servidor']);
 }
 
 class NetworkFailure extends Failure {
-  const NetworkFailure([String message = 'Falha na conexão de rede']) : super(message);
+  const NetworkFailure([super.message = 'Falha na conexão de rede']);
 }
 
 class CacheFailure extends Failure {
-  const CacheFailure([String message = 'Falha no armazenamento local']) : super(message);
+  const CacheFailure([super.message = 'Falha no armazenamento local']);
 }
 
 class InvalidInputFailure extends Failure {
-  const InvalidInputFailure([String message = 'Entrada inválida']) : super(message);
+  const InvalidInputFailure([super.message = 'Entrada inválida']);
 }
 
 class AuthenticationFailure extends Failure {
-  const AuthenticationFailure([String message = 'Falha na autenticação']) : super(message);
+  const AuthenticationFailure([super.message = 'Falha na autenticação']);
 }
 
 class NotFoundFailure extends Failure {
-  const NotFoundFailure([String message = 'Recurso não encontrado']) : super(message);
+  const NotFoundFailure([super.message = 'Recurso não encontrado']);
 }
 
 class UnexpectedFailure extends Failure {
-  const UnexpectedFailure([String message = 'Ocorreu um erro inesperado']) : super(message);
+  const UnexpectedFailure([super.message = 'Ocorreu um erro inesperado']);
 }
 
 class TimeoutFailure extends Failure {
-  const TimeoutFailure([String message = 'Tempo de conexão esgotado']) : super(message);
+  const TimeoutFailure([super.message = 'Tempo de conexão esgotado']);
 }
 
 class ApiLimitExceededFailure extends Failure {
-  const ApiLimitExceededFailure([String message = 'Limite de requisições da API excedido']) : super(message);
+  const ApiLimitExceededFailure([super.message = 'Limite de requisições da API excedido']);
 }

@@ -7,10 +7,10 @@ class KeyboardDismisser extends StatelessWidget {
   final bool excludeFromSemantics;
 
   const KeyboardDismisser({
-    Key? key,
+    super.key,
     required this.child,
     this.excludeFromSemantics = false,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -42,9 +42,9 @@ class AppKeyboardManager extends StatelessWidget {
   final Widget child;
 
   const AppKeyboardManager({
-    Key? key,
+    super.key,
     required this.child,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

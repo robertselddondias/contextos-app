@@ -11,10 +11,10 @@ class PremiumBannerWrapper extends StatefulWidget {
   final bool showInScreen; // Nova propriedade para controlar onde o banner aparece
 
   const PremiumBannerWrapper({
-    Key? key,
+    super.key,
     required this.child,
     this.showInScreen = false, // Por padrão, não mostra o banner
-  }) : super(key: key);
+  });
 
   @override
   State<PremiumBannerWrapper> createState() => _PremiumBannerWrapperState();

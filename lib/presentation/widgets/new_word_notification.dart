@@ -1,18 +1,16 @@
 // lib/presentation/widgets/new_word_notification.dart
 import 'package:contextual/core/constants/color_constants.dart';
-import 'package:contextual/presentation/blocs/game/game_bloc.dart';
 import 'package:contextual/utils/responsive_utils.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 
 /// Widget que exibe uma notificação quando uma nova palavra do dia está disponível
 class NewWordNotification extends StatelessWidget {
   final VoidCallback onRefresh;
 
   const NewWordNotification({
-    Key? key,
+    super.key,
     required this.onRefresh,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

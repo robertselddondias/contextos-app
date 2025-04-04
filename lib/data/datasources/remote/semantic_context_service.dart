@@ -12,7 +12,7 @@ class SemanticContextService {
   SemanticContextService._internal();
 
   // Mapa de contextos - cada palavra-chave mapeia para um conjunto de palavras relacionadas
-  Map<String, Map<String, double>> _contextMap = {};
+  final Map<String, Map<String, double>> _contextMap = {};
 
   // Conjuntos de palavras por categoria
   Map<String, Set<String>> _categoryWords = {};

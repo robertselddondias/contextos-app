@@ -180,193 +180,178 @@ class _GameScreenState extends State<GameScreen> {
                 ? state
                 : (state as GameLoading).previousState as GameLoaded;
 
-            // Use SafeArea para garantir que o conteúdo está dentro da área segura da tela
-            return SafeArea(
-              child: Column(
-                children: [
-                  // Banner de anúncio no topo
-                  if (!gameState.isCompleted)
-                    const AdBannerWidget(isTop: true),
+            // Usamos LayoutBuilder para garantir layout responsivo
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                return SafeArea(
+                  child: Column(
+                    children: [
+                      // Banner de anúncio no topo
+                      if (!gameState.isCompleted)
+                        const AdBannerWidget(isTop: true),
 
-                  // Cabeçalho com informações do jogo
-                  GameHeader(
-                    bestScore: gameState.bestScore,
-                    currentAttempts: gameState.guesses.length,
-                    isCompleted: gameState.isCompleted,
-                  ),
-
-                  // Lista de tentativas
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: 8.0),
-                      child: GuessList(
-                        guesses: gameState.guesses,
-                        isLoading: state is GameLoading,
+                      // Cabeçalho com informações do jogo
+                      GameHeader(
+                        bestScore: gameState.bestScore,
+                        currentAttempts: gameState.guesses.length,
+                        isCompleted: gameState.isCompleted,
                       ),
-                    ),
-                  ),
 
-                  // Container para botões e input com altura mínima
-                  Container(
-                    constraints: BoxConstraints(
-                      maxHeight: MediaQuery.of(context).size.height * 0.25,
-                    ),
-                    child: SingleChildScrollView(
-                      physics: const BouncingScrollPhysics(),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // Botão de anúncio recompensado quando o jogador está travado
-                          FutureBuilder<String?>(
-                            future: _getAvailableHintWord(gameState),
-                            builder: (context, snapshot) {
-                              // Se não há dica disponível, retorna um SizedBox vazio
-                              if (!snapshot.hasData ||
-                                  snapshot.data == null ||
-                                  snapshot.data!.isEmpty ||
-                                  !gameState.guesses.isNotEmpty ||
-                                  gameState.guesses.length < 5) {
-                                return const SizedBox.shrink();
-                              }
+                      // Lista de tentativas com Expanded
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 8.0),
+                          child: GuessList(
+                            guesses: gameState.guesses,
+                            isLoading: state is GameLoading,
+                          ),
+                        ),
+                      ),
 
-                              return Padding(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: context.responsiveValue(
-                                    small: 12.0,
-                                    medium: 16.0,
-                                    large: 20.0,
+                      // Container para botões e input com SingleChildScrollView
+                      SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            FutureBuilder<String?>(
+                              future: _getAvailableHintWord(gameState),
+                              builder: (context, snapshot) {
+                                // Se não há dica disponível, retorna um SizedBox vazio
+                                if (!snapshot.hasData ||
+                                    snapshot.data == null ||
+                                    snapshot.data!.isEmpty ||
+                                    !gameState.guesses.isNotEmpty ||
+                                    gameState.guesses.length < 5) {
+                                  return const SizedBox.shrink();
+                                }
+
+                                return Padding(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: context.responsiveValue(
+                                      small: 12.0,
+                                      medium: 16.0,
+                                      large: 20.0,
+                                    ),
+                                    vertical: 4.0,
                                   ),
-                                  vertical: 4.0,
-                                ),
-                                child: RewardedAdButton(
-                                  text: 'Obter uma dica',
-                                  rewardText: 'Carregando sua dica...',
-                                  icon: Icons.lightbulb_outline,
-                                  onRewarded: () async {
-                                    final hintWord = snapshot.data!;
+                                  child: RewardedAdButton(
+                                    text: 'Obter uma dica',
+                                    rewardText: 'Carregando sua dica...',
+                                    icon: Icons.lightbulb_outline,
+                                    onRewarded: () async {
+                                      final hintWord = snapshot.data!;
 
-                                    context.read<GameBloc>().add(GuessSubmitted(hintWord, isHint: true));
-                                    context.read<GameBloc>().add(const GameRefreshDaily(isAfterAd: true));
-
-                                    if (mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            'Dica: Uma palavra relacionada é "$hintWord"',
-                                            style: TextStyle(fontSize: context
-                                                .responsiveFontSize(14)),
-                                          ),
-                                          backgroundColor: ColorConstants.info,
-                                          behavior: SnackBarBehavior.floating,
-                                          duration: const Duration(seconds: 5),
-                                        ),
+                                      context.read<GameBloc>().add(
+                                          GuessSubmitted(hintWord, isHint: true)
                                       );
+
+                                      //context.read<GameBloc>().add(GuessSubmitted(hintWord, isHint: true));
+                                      //context.read<GameBloc>().add(const GameRefreshDaily(isAfterAd: true));
+                                    },
+                                  ),
+                                );
+                              },
+                            ),
+
+                            // Campo de entrada para novas tentativas
+                            if (!gameState.isCompleted)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                                child: GuessInput(
+                                  controller: _guessController,
+                                  isLoading: state is GameLoading,
+                                  onSubmitted: (guess) {
+                                    if (guess.trim().isNotEmpty) {
+                                      FocusScope.of(context).unfocus();
+                                      context.read<GameBloc>().add(
+                                          GuessSubmitted(guess.trim()));
+                                      _guessController.clear();
                                     }
                                   },
                                 ),
-                              );
-                            },
-                          ),
-
-                          // Campo de entrada para novas tentativas
-                          if (!gameState.isCompleted)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 4.0),
-                              child: GuessInput(
-                                controller: _guessController,
-                                isLoading: state is GameLoading,
-                                onSubmitted: (guess) {
-                                  if (guess.trim().isNotEmpty) {
-                                    FocusScope.of(context).unfocus();
-                                    context.read<GameBloc>().add(
-                                        GuessSubmitted(guess.trim()));
-                                    _guessController.clear();
-                                  }
-                                },
                               ),
-                            ),
 
-                          // Botões e anúncios quando o jogo é completado
-                          if (gameState.isCompleted)
-                            Padding(
-                              padding: EdgeInsets.all(context.responsiveValue(
-                                small: 8.0,
-                                medium: 12.0,
-                                large: 16.0,
-                              )),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  ElevatedButton.icon(
-                                    onPressed: () =>
-                                        _shareResults(context, gameState),
-                                    icon: Icon(Icons.share,
-                                        size: context.responsiveSize(18)),
-                                    label: Text(
-                                      'Compartilhar Resultados',
-                                      style: TextStyle(
-                                          fontSize: context.responsiveFontSize(
-                                              14)),
+                            // Botões e anúncios quando o jogo é completado
+                            if (gameState.isCompleted)
+                              Padding(
+                                padding: EdgeInsets.all(context.responsiveValue(
+                                  small: 8.0,
+                                  medium: 12.0,
+                                  large: 16.0,
+                                )),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    ElevatedButton.icon(
+                                      onPressed: () =>
+                                          _shareResults(context, gameState),
+                                      icon: Icon(Icons.share,
+                                          size: context.responsiveSize(18)),
+                                      label: Text(
+                                        'Compartilhar Resultados',
+                                        style: TextStyle(
+                                            fontSize: context.responsiveFontSize(14)),
+                                      ),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: ColorConstants.success,
+                                        foregroundColor: Colors.white,
+                                        minimumSize: Size(double.infinity,
+                                            context.responsiveSize(50)),
+                                      ),
                                     ),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: ColorConstants.success,
-                                      foregroundColor: Colors.white,
-                                      minimumSize: Size(double.infinity,
-                                          context.responsiveSize(50)),
-                                    ),
-                                  ),
 
-                                  SizedBox(height: context.responsiveValue(
-                                    small: 8.0,
-                                    medium: 12.0,
-                                    large: 16.0,
-                                  )),
+                                    SizedBox(height: context.responsiveValue(
+                                      small: 8.0,
+                                      medium: 12.0,
+                                      large: 16.0,
+                                    )),
 
-                                  // Botão para anúncios recompensados
-                                  RewardedAdButton(
-                                    text: 'Palavra extra',
-                                    rewardText: 'Você desbloqueou uma palavra extra para hoje!',
-                                    icon: Icons.card_giftcard,
-                                    onRewarded: () {
-                                      // Lógica para desbloquear palavra extra
-                                      context.read<GameBloc>().add(
-                                          const GameReset());
+                                    // Botão para anúncios recompensados
+                                    RewardedAdButton(
+                                      text: 'Palavra extra',
+                                      rewardText: 'Você desbloqueou uma palavra extra para hoje!',
+                                      icon: Icons.card_giftcard,
+                                      onRewarded: () {
+                                        // Lógica para desbloquear palavra extra
+                                        context.read<GameBloc>().add(
+                                            const GameReset());
 
-                                      // Exibir mensagem de sucesso
-                                      ScaffoldMessenger
-                                          .of(context)
-                                          .showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            'Você desbloqueou uma palavra extra para hoje!',
-                                            style: TextStyle(fontSize: context
-                                                .responsiveFontSize(14)),
+                                        // Exibir mensagem de sucesso
+                                        ScaffoldMessenger
+                                            .of(context)
+                                            .showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              'Você desbloqueou uma palavra extra para hoje!',
+                                              style: TextStyle(fontSize: context
+                                                  .responsiveFontSize(14)),
+                                            ),
+                                            backgroundColor: ColorConstants
+                                                .success,
+                                            behavior: SnackBarBehavior.floating,
                                           ),
-                                          backgroundColor: ColorConstants
-                                              .success,
-                                          behavior: SnackBarBehavior.floating,
-                                        ),
-                                      );
-                                    },
-                                  ),
+                                        );
+                                      },
+                                    ),
 
-                                  // Banner no fundo da tela quando o jogo for completado
-                                  SizedBox(height: context.responsiveValue(
-                                    small: 8.0,
-                                    medium: 12.0,
-                                    large: 16.0,
-                                  )),
-                                  const AdBannerWidget(isTop: false),
-                                ],
+                                    // Banner no fundo da tela quando o jogo for completado
+                                    SizedBox(height: context.responsiveValue(
+                                      small: 8.0,
+                                      medium: 12.0,
+                                      large: 16.0,
+                                    )),
+                                    const AdBannerWidget(isTop: false),
+                                  ],
+                                ),
                               ),
-                            ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
+                    ],
                   ),
-                ],
-              ),
+                );
+              },
             );
           }
 

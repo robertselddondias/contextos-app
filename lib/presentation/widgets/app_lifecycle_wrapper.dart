@@ -9,9 +9,9 @@ class AppLifecycleWrapper extends StatefulWidget {
   final Widget child;
 
   const AppLifecycleWrapper({
-    Key? key,
+    super.key,
     required this.child,
-  }) : super(key: key);
+  });
 
   @override
   State<AppLifecycleWrapper> createState() => _AppLifecycleWrapperState();

@@ -13,9 +13,7 @@ class AppVersionHelper {
 
   /// Inicializa e carrega as informações do pacote
   Future<void> initialize() async {
-    if (_packageInfo == null) {
-      _packageInfo = await PackageInfo.fromPlatform();
-    }
+    _packageInfo ??= await PackageInfo.fromPlatform();
   }
 
   /// Obtém a versão do aplicativo no formato "x.y.z"
