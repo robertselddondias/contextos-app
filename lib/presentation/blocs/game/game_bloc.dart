@@ -868,23 +868,14 @@ class GameBloc extends Bloc<GameEvent, GameState> {
     final today = DateTime.now();
     final dayNumber = today.difference(DateTime(2023, 1, 1)).inDays;
 
-    String shareText = 'Contextual #$dayNumber\n';
+    String shareText = 'Contextual\n';
 
     if (currentState.isCompleted) {
-      shareText += 'Encontrei a palavra ${currentState.targetWord.toUpperCase()} em ${currentState.guesses.length} tentativas!\n\n';
+      shareText += 'Encontrei a palavra secreta em ${currentState.guesses.length} tentativas!\n\n';
     }  else {
-      shareText += 'Ainda estou tentando...\n\n';
+      shareText += 'Ainda estou tentando...';
     }
-
-    // Adiciona as últimas 5 tentativas
-    final startIndex = currentState.guesses.length > 5
-        ? currentState.guesses.length - 5
-        : 0;
-
-    for (int i = startIndex; i < currentState.guesses.length; i++) {
-      final guess = currentState.guesses[i];
-      shareText += '${i + 1}. ${guess.word} (${(guess.similarity * 100).toStringAsFixed(0)}%)\n';
-    }
+    shareText += '\n\nBaixe agora na sua loja de aplicativo Contextual';
 
     return shareText;
   }

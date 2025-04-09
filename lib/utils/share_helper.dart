@@ -33,7 +33,7 @@ class ShareHelper {
           children: [
             const Text(
               'Não foi possível abrir o menu de compartilhamento. '
-                  'Você pode copiar o texto abaixo e compartilhar manualmente:',
+                  'Você pode copiar o texto a baixo e compartilhar manualmente:',
             ),
             const SizedBox(height: 16),
             Container(

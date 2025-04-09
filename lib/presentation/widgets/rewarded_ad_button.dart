@@ -1,10 +1,7 @@
 // lib/presentation/widgets/rewarded_ad_button.dart
 import 'package:contextual/core/constants/color_constants.dart';
-import 'package:contextual/presentation/blocs/game/game_bloc.dart';
 import 'package:contextual/services/ad_manager.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 
 class RewardedAdButton extends StatefulWidget {
   final String text;
@@ -34,13 +31,6 @@ class _RewardedAdButtonState extends State<RewardedAdButton> {
   @override
   void initState() {
     super.initState();
-    _initAdManager();
-  }
-
-  Future<void> _initAdManager() async {
-    if (!_adManager.isInitialized) {
-      await _adManager.initialize();
-    }
     _checkAdStatus();
   }
 
@@ -49,17 +39,15 @@ class _RewardedAdButtonState extends State<RewardedAdButton> {
       setState(() {
         _isAdReady = _adManager.isRewardedAdReady;
       });
+    }
 
-      debugPrint('RewardedAdButton: Anúncio recompensado está pronto? $_isAdReady');
-
-      // Verifica novamente após um atraso se o anúncio não estiver pronto
-      if (!_isAdReady) {
-        Future.delayed(const Duration(seconds: 2), () {
-          if (mounted) {
-            _checkAdStatus();
-          }
-        });
-      }
+    // Verifica novamente após um atraso se o anúncio não estiver pronto
+    if (!_isAdReady) {
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) {
+          _checkAdStatus();
+        }
+      });
     }
   }
 
@@ -78,15 +66,6 @@ class _RewardedAdButtonState extends State<RewardedAdButton> {
       _isLoading = true;
     });
 
-    // Obtenha o estado atual do jogo antes de mostrar o anúncio (para debug)
-    if (kDebugMode) {
-      final gameBloc = context.read<GameBloc>();
-      if (gameBloc.state is GameLoaded) {
-        final currentState = gameBloc.state as GameLoaded;
-        print('RewardedAdButton: Estado antes do anúncio - ${currentState.guesses.length} tentativas');
-      }
-    }
-
     final bool rewardEarned = await _adManager.showRewardedAd();
 
     if (mounted) {
@@ -96,13 +75,9 @@ class _RewardedAdButtonState extends State<RewardedAdButton> {
       });
 
       if (rewardEarned) {
-        // Quando a recompensa é ganha, use isAfterAd=true para o refresh
-        context.read<GameBloc>().add(const GameRefreshDaily(isAfterAd: true));
-
-        // Agora chame o callback de recompensa
         widget.onRewarded();
 
-        // Exibir mensagem de sucesso
+        // Exibe uma mensagem de sucesso
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(widget.rewardText),
@@ -110,19 +85,10 @@ class _RewardedAdButtonState extends State<RewardedAdButton> {
             behavior: SnackBarBehavior.floating,
           ),
         );
-
-        // Verifique o estado após o processamento (para debug)
-        if (kDebugMode) {
-          final gameBloc = context.read<GameBloc>();
-          if (gameBloc.state is GameLoaded) {
-            final currentState = gameBloc.state as GameLoaded;
-            print('RewardedAdButton: Estado após o anúncio - ${currentState.guesses.length} tentativas');
-          }
-        }
       }
     }
 
-    // Verificar novamente o status do anúncio
+    // Verifica novamente o status do anúncio
     _checkAdStatus();
   }
 

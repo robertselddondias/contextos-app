@@ -17,6 +17,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'dart:math';
 import 'dart:math' as math;
 
+import 'package:get/get.dart';
+
 class GameScreen extends StatefulWidget {
   const GameScreen({super.key});
 
@@ -183,33 +185,36 @@ class _GameScreenState extends State<GameScreen> {
             // Usamos LayoutBuilder para garantir layout responsivo
             return LayoutBuilder(
               builder: (context, constraints) {
-                return SafeArea(
-                  child: Column(
-                    children: [
-                      // Banner de anúncio no topo
-                      if (!gameState.isCompleted)
-                        const AdBannerWidget(isTop: true),
+                return Column(
+                  children: [
+                    // Banner de anúncio no topo
+                    if (!gameState.isCompleted)
+                      const AdBannerWidget(isTop: true),
 
-                      // Cabeçalho com informações do jogo
-                      GameHeader(
-                        bestScore: gameState.bestScore,
-                        currentAttempts: gameState.guesses.length,
-                        isCompleted: gameState.isCompleted,
-                      ),
+                    // Cabeçalho com informações do jogo
+                    GameHeader(
+                      bestScore: gameState.bestScore,
+                      currentAttempts: gameState.guesses.length,
+                      isCompleted: gameState.isCompleted,
+                    ),
 
-                      // Lista de tentativas com Expanded
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.only(bottom: 8.0),
-                          child: GuessList(
-                            guesses: gameState.guesses,
-                            isLoading: state is GameLoading,
-                          ),
+                    // Lista de tentativas (com maior prioridade)
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 8.0),
+                        child: GuessList(
+                          guesses: gameState.guesses,
+                          isLoading: state is GameLoading,
                         ),
                       ),
+                    ),
 
-                      // Container para botões e input com SingleChildScrollView
-                      SingleChildScrollView(
+                    // Container com altura máxima para conteúdo responsivo
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: constraints.maxHeight * 0.35, // Limita a 35% da altura
+                      ),
+                      child: SingleChildScrollView(
                         physics: const BouncingScrollPhysics(),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
@@ -228,7 +233,7 @@ class _GameScreenState extends State<GameScreen> {
 
                                 return Padding(
                                   padding: EdgeInsets.symmetric(
-                                    horizontal: context.responsiveValue(
+                                    horizontal: ResponsiveContext(context).responsiveValue(
                                       small: 12.0,
                                       medium: 16.0,
                                       large: 20.0,
@@ -275,7 +280,7 @@ class _GameScreenState extends State<GameScreen> {
                             // Botões e anúncios quando o jogo é completado
                             if (gameState.isCompleted)
                               Padding(
-                                padding: EdgeInsets.all(context.responsiveValue(
+                                padding: EdgeInsets.all(ResponsiveContext(context).responsiveValue(
                                   small: 8.0,
                                   medium: 12.0,
                                   large: 16.0,
@@ -287,21 +292,21 @@ class _GameScreenState extends State<GameScreen> {
                                       onPressed: () =>
                                           _shareResults(context, gameState),
                                       icon: Icon(Icons.share,
-                                          size: context.responsiveSize(18)),
+                                          size: ResponsiveContext(context).responsiveSize(18)),
                                       label: Text(
                                         'Compartilhar Resultados',
                                         style: TextStyle(
-                                            fontSize: context.responsiveFontSize(14)),
+                                            fontSize: ResponsiveContext(context).responsiveFontSize(14)),
                                       ),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: ColorConstants.success,
                                         foregroundColor: Colors.white,
                                         minimumSize: Size(double.infinity,
-                                            context.responsiveSize(50)),
+                                            ResponsiveContext(context).responsiveSize(50)),
                                       ),
                                     ),
 
-                                    SizedBox(height: context.responsiveValue(
+                                    SizedBox(height: ResponsiveContext(context).responsiveValue(
                                       small: 8.0,
                                       medium: 12.0,
                                       large: 16.0,
@@ -336,7 +341,7 @@ class _GameScreenState extends State<GameScreen> {
                                     ),
 
                                     // Banner no fundo da tela quando o jogo for completado
-                                    SizedBox(height: context.responsiveValue(
+                                    SizedBox(height: ResponsiveContext(context).responsiveValue(
                                       small: 8.0,
                                       medium: 12.0,
                                       large: 16.0,
@@ -348,8 +353,8 @@ class _GameScreenState extends State<GameScreen> {
                           ],
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 );
               },
             );
@@ -365,15 +370,12 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   void _showErrorSnackBar(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          message,
-          style: TextStyle(fontSize: context.responsiveFontSize(14)),
-        ),
-        backgroundColor: ColorConstants.error,
-        behavior: SnackBarBehavior.floating,
-      ),
+    Get.snackbar(
+      'Alerta',
+      message,
+      backgroundColor: ColorConstants.error,
+      colorText: Colors.white,
+      snackPosition: SnackPosition.TOP,
     );
   }
 
@@ -381,76 +383,76 @@ class _GameScreenState extends State<GameScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-      title: Text(
-      'Como Jogar',
-      style: TextStyle(
-        fontSize: context.responsiveFontSize(18),
-        fontWeight: FontWeight.bold,
-      ),
-    ),
-    content: SingleChildScrollView(
-    child: Column(
-    mainAxisSize: MainAxisSize.min,
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-    Text(
-    'Tente adivinhar a palavra secreta do dia!',
-      style: TextStyle(
-        fontWeight: FontWeight.bold,
-        fontSize: context.responsiveFontSize(15),
-      ),
-    ),
-      SizedBox(height: context.responsiveSize(16)),
-      Text(
-        '1. Digite uma palavra e veja quão próxima ela está da palavra-alvo.',
-        style: TextStyle(fontSize: context.responsiveFontSize(14)),
-      ),
-      SizedBox(height: context.responsiveSize(8)),
-      Text(
-        '2. A porcentagem indica a proximidade semântica entre sua palavra e a palavra-alvo.',
-        style: TextStyle(fontSize: context.responsiveFontSize(14)),
-      ),
-      SizedBox(height: context.responsiveSize(8)),
-      Text(
-        '3. Use as dicas para se aproximar da palavra certa.',
-        style: TextStyle(fontSize: context.responsiveFontSize(14)),
-      ),
-      SizedBox(height: context.responsiveSize(8)),
-      Text(
-        '4. Se a palavra não estiver no contexto semântico, ela será analisada por similaridade linguística, considerando aspectos como coincidência de letras com a palavra secreta.',
-        style: TextStyle(fontSize: context.responsiveFontSize(14), fontWeight: FontWeight.bold),
-      ),
-      SizedBox(height: context.responsiveSize(8)),
-      Text(
-        '5. Tente acertar com o menor número possível de tentativas!',
-        style: TextStyle(fontSize: context.responsiveFontSize(14)),
-      ),
-      SizedBox(height: context.responsiveSize(16)),
-      Text(
-        'Exemplo:',
-        style: TextStyle(
-          fontWeight: FontWeight.bold,
-          fontSize: context.responsiveFontSize(15),
+        title: Text(
+          'Como Jogar',
+          style: TextStyle(
+            fontSize: context.responsiveFontSize(18),
+            fontWeight: FontWeight.bold,
+          ),
         ),
-      ),
-      SizedBox(height: context.responsiveSize(8)),
-      Text(
-        'Se a palavra-alvo for "cachorro" e você digitar "gato", a similaridade pode ser cerca de 70%.',
-        style: TextStyle(fontSize: context.responsiveFontSize(14)),
-      ),
-      SizedBox(height: context.responsiveSize(8)),
-      Text(
-        'Se você digitar "animal", a similaridade pode ser cerca de 50%.',
-        style: TextStyle(fontSize: context.responsiveFontSize(14)),
-      ),
-      SizedBox(height: context.responsiveSize(8)),
-      Text(
-        'A palavra exata terá 100% de similaridade.',
-        style: TextStyle(fontSize: context.responsiveFontSize(14)),
-      ),
-    ],
-    ),
-    ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Tente adivinhar a palavra secreta do dia!',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: context.responsiveFontSize(15),
+                ),
+              ),
+              SizedBox(height: context.responsiveSize(16)),
+              Text(
+                '1. Digite uma palavra e veja quão próxima ela está da palavra-alvo.',
+                style: TextStyle(fontSize: context.responsiveFontSize(14)),
+              ),
+              SizedBox(height: context.responsiveSize(8)),
+              Text(
+                '2. A porcentagem indica a proximidade semântica entre sua palavra e a palavra-alvo.',
+                style: TextStyle(fontSize: context.responsiveFontSize(14)),
+              ),
+              SizedBox(height: context.responsiveSize(8)),
+              Text(
+                '3. Use as dicas para se aproximar da palavra certa.',
+                style: TextStyle(fontSize: context.responsiveFontSize(14)),
+              ),
+              SizedBox(height: context.responsiveSize(8)),
+              Text(
+                '4. Se a palavra não estiver no contexto semântico, ela será analisada por similaridade linguística, considerando aspectos como coincidência de letras com a palavra secreta.',
+                style: TextStyle(fontSize: context.responsiveFontSize(14), fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: context.responsiveSize(8)),
+              Text(
+                '5. Tente acertar com o menor número possível de tentativas!',
+                style: TextStyle(fontSize: context.responsiveFontSize(14)),
+              ),
+              SizedBox(height: context.responsiveSize(16)),
+              Text(
+                'Exemplo:',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: context.responsiveFontSize(15),
+                ),
+              ),
+              SizedBox(height: context.responsiveSize(8)),
+              Text(
+                'Se a palavra-alvo for "cachorro" e você digitar "gato", a similaridade pode ser cerca de 70%.',
+                style: TextStyle(fontSize: context.responsiveFontSize(14)),
+              ),
+              SizedBox(height: context.responsiveSize(8)),
+              Text(
+                'Se você digitar "animal", a similaridade pode ser cerca de 50%.',
+                style: TextStyle(fontSize: context.responsiveFontSize(14)),
+              ),
+              SizedBox(height: context.responsiveSize(8)),
+              Text(
+                'A palavra exata terá 100% de similaridade.',
+                style: TextStyle(fontSize: context.responsiveFontSize(14)),
+              ),
+            ],
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),

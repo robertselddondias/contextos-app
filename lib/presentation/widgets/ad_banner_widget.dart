@@ -1,6 +1,5 @@
 // lib/presentation/widgets/ad_banner_widget.dart
 import 'package:contextual/services/ad_manager.dart';
-import 'package:contextual/utils/ad_size_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
@@ -14,100 +13,59 @@ class AdBannerWidget extends StatefulWidget {
 }
 
 class _AdBannerWidgetState extends State<AdBannerWidget> {
-  BannerAd? _bannerAd;
-  bool _isAdLoaded = false;
   final AdManager _adManager = AdManager();
-  bool _isPremium = false;
+  bool _isAdLoaded = false;
 
   @override
   void initState() {
     super.initState();
-    // Inicialização segura após o build completo do widget
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initialize();
-    });
+    _loadBannerAd();
   }
 
   @override
   void dispose() {
-    _bannerAd?.dispose();
     super.dispose();
   }
 
-  Future<void> _initialize() async {
-    await _adManager.initialize();
+  Future<void> _loadBannerAd() async {
+    // Cria uma instância do AdManager
+    if (!_adManager.isInitialized) {
+      await _adManager.initialize();
+    }
 
-    if (!mounted) return;
+    // Determina o tamanho do banner
+    final AdSize adSize = await _getAdaptiveBannerSize();
 
-    final isPremium = _adManager.isPremium;
+    // Carregar o anúncio
+    await _adManager.loadBannerAd(size: adSize);
 
-    setState(() {
-      _isPremium = isPremium;
-    });
+    if (mounted) {
+      setState(() {
+        _isAdLoaded = _adManager.isBannerAdLoaded;
+      });
+    }
 
-    if (!isPremium) {
-      // Só carrega o anúncio se não for premium
-      _loadBannerAd();
+    // Se o anúncio não carregar, tentar novamente após um tempo
+    if (!_isAdLoaded) {
+      Future.delayed(const Duration(minutes: 1), () {
+        if (mounted) {
+          _loadBannerAd();
+        }
+      });
     }
   }
 
-  Future<void> _loadBannerAd() async {
-    if (!mounted) return;
-
-    try {
-      // Usa o método seguro para obter o tamanho adaptativo
-      final adSize = await AdSizeExtension.getSafeAdaptiveBannerSize(context);
-
-      // Configura o banner ad
-      _bannerAd = BannerAd(
-        adUnitId: _adManager.bannerAdUnitId,
-        size: adSize,
-        request: const AdRequest(),
-        listener: BannerAdListener(
-          onAdLoaded: (ad) {
-            if (mounted) {
-              setState(() {
-                _isAdLoaded = true;
-              });
-            }
-          },
-          onAdFailedToLoad: (ad, error) {
-            debugPrint('Falha ao carregar banner ad: ${error.message}');
-            ad.dispose();
-
-            if (mounted) {
-              setState(() {
-                _bannerAd = null;
-                _isAdLoaded = false;
-              });
-            }
-
-            // Tenta recarregar após falha
-            Future.delayed(const Duration(minutes: 1), () {
-              if (mounted) {
-                _loadBannerAd();
-              }
-            });
-          },
-        ),
-      );
-
-      // Carrega o anúncio
-      await _bannerAd?.load();
-    } catch (e) {
-      debugPrint('Erro ao carregar banner ad: $e');
-    }
+  Future<AdSize> _getAdaptiveBannerSize() async {
+    final width = MediaQuery.of(context).size.width;
+    return _adManager.getAdaptiveBannerAdSize(width);
   }
 
   @override
   Widget build(BuildContext context) {
-    // Se for premium, não mostra anúncio
-    if (_isPremium) {
-      return const SizedBox.shrink();
-    }
-
-    // Se o anúncio não estiver carregado, mostra espaço reservado
-    if (!_isAdLoaded || _bannerAd == null) {
+    // Se não houver anúncio carregado, retorna um espaço reservado
+    if (!_isAdLoaded || _adManager.getBannerAd() == null) {
+      // Retorna um espaço reservado com a altura de um banner padrão
+      // para evitar pulos no layout quando o anúncio carregar
       return Container(
         height: 50, // Altura aproximada de um banner padrão
         alignment: Alignment.center,
@@ -122,7 +80,7 @@ class _AdBannerWidgetState extends State<AdBannerWidget> {
     return Container(
       alignment: Alignment.center,
       width: MediaQuery.of(context).size.width,
-      height: _bannerAd!.size.height.toDouble(),
+      height: _adManager.getBannerAd()!.size.height.toDouble(),
       decoration: BoxDecoration(
         color: Colors.grey.withOpacity(0.05), // Fundo sutil para o anúncio
         border: Border(
@@ -130,7 +88,7 @@ class _AdBannerWidgetState extends State<AdBannerWidget> {
           top: !widget.isTop ? BorderSide(color: Colors.grey.withOpacity(0.2), width: 1) : BorderSide.none,
         ),
       ),
-      child: AdWidget(ad: _bannerAd!),
+      child: AdWidget(ad: _adManager.getBannerAd()!),
     );
   }
 }

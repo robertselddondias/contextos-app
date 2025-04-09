@@ -23,6 +23,7 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
+
   // Set orientation preferences
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,

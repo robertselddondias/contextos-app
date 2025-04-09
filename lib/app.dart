@@ -11,6 +11,7 @@ import 'package:contextual/utils/keyboard_dismisser.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:get/get_navigation/get_navigation.dart';
 import 'package:get_it/get_it.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -45,10 +46,10 @@ class ContextoApp extends StatelessWidget {
           previous.themeMode != current.themeMode ||
               previous.locale != current.locale,
           builder: (context, state) {
-            // Envolve o MaterialApp com o AppLifecycleWrapper e o AppKeyboardManager
+            // Envolve o GetMaterialApp com o AppLifecycleWrapper e o AppKeyboardManager
             return AppLifecycleWrapper(
               child: AppKeyboardManager(
-                child: MaterialApp(
+                child: GetMaterialApp(
                   title: 'Contexto',
                   debugShowCheckedModeBanner: false,
                   themeMode: state.themeMode,
@@ -65,16 +66,24 @@ class ContextoApp extends StatelessWidget {
                     Locale('es', 'ES'),
                   ],
                   locale: state.locale,
-                  routes: AppRoutes.routes,
+                  getPages: [
+                    // Converta as rotas do MaterialApp para rotas do GetX
+                    for (var entry in AppRoutes.routes.entries)
+                      GetPage(
+                          name: entry.key,
+                          page: () => entry.value(context)
+                      ),
+                  ],
+                  initialRoute: AppRoutes.splash,
                   home: FutureBuilder<bool>(
                     future: _shouldShowOnboarding(),
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const SplashScreen();
                       }
-      
+
                       final shouldShowOnboarding = snapshot.data ?? false;
-      
+
                       if (shouldShowOnboarding) {
                         return const OnboardingScreen();
                       } else {
